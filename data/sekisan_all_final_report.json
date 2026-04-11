@@ -1,0 +1,38 @@
+{
+  "row_count": 650,
+  "missing_rows": [],
+  "missing_required_fields": {
+    "stem": [],
+    "choiceA": [],
+    "choiceB": [],
+    "choiceC": [],
+    "choiceD": [],
+    "correct": [],
+    "explainShort": []
+  },
+  "status_counts": {
+    "published": 650
+  },
+  "type_counts": {
+    "knowledge": 650
+  },
+  "vision_rows_used": [
+    "H26sekisan-040",
+    "H30sekisan-024",
+    "R2sekisan-013",
+    "R4sekisan-027",
+    "R4sekisan-035",
+    "R5sekisan-001",
+    "R5sekisan-010",
+    "R5sekisan-025",
+    "R5sekisan-043",
+    "R6sekisan-002",
+    "R6sekisan-018",
+    "R6sekisan-026",
+    "R7sekisan-003",
+    "R7sekisan-025",
+    "R7sekisan-043"
+  ],
+  "review_fix_count": 12,
+  "output_csv": "C:\\tmp\\kakomon\\sekisanshi\\sekisan_all_final.csv"
+}
