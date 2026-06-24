@@ -10,6 +10,7 @@
 - `logic.gs`: 出題ロジック、採点、統計、アドバイス生成
 - `api.gs`: Home/Test/Mock/Admin API
 - `auth.gs`: OAuth とユーザー識別
+- `memberRoster.gs`: 建築・土木と同じ26名の UserAccess 同期
 - `index.html`: 単一 HTML のフロントエンド
 - `importCsv.gs`: Dry-run / Import の CSV 取り込み
 - `sekisanConfig.gs`: sekisan 固有の年度、表示名、画像パス変換

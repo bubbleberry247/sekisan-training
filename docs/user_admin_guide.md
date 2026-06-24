@@ -16,21 +16,23 @@
 - `admin` : 本人 + 直属部下の集計 + ユーザー管理
 
 ## UserAccess シートの列
-`email, role, managerEmail, active, updatedAt`
+`email, role, managerEmail, active, updatedAt, displayName, showInDashboard`
 
 - **email**: Google Workspace のメール
 - **role**: `user` / `manager` / `admin`
 - **managerEmail**: 直属上長のメール（user のみ必須）
 - **active**: `true` / `false`
 - **updatedAt**: 更新日時（自動で上書き）
+- **displayName**: ダッシュボード上の表示名
+- **showInDashboard**: 管理者/上長ダッシュボードに表示する場合は `true`、開発者や非表示対象は `false`
 
 ## 一括登録（CSV）
 ### フォーマット
 ```
-email,role,managerEmail,active
+email,role,managerEmail,active,showInDashboard,displayName
 manager@company.co.jp,manager,,true
-staff1@company.co.jp,user,manager@company.co.jp,true
-staff2@company.co.jp,user,manager@company.co.jp,true
+staff1@company.co.jp,user,manager@company.co.jp,true,true,受講者1
+staff2@company.co.jp,user,manager@company.co.jp,true,true,受講者2
 ```
 
 ### 手順
@@ -46,8 +48,9 @@ staff2@company.co.jp,user,manager@company.co.jp,true
 
 ## 表示ルール
 - **本人**: 自分の KPI / 週間推移 / 受験履歴
-- **上長**: チーム進捗（メンバー別の集計のみ）
+- **上長**: `managerEmail` が自分のメールと一致するメンバーのチーム進捗（メンバー別の集計のみ）
 - **管理者**: 上長と同じ + ユーザー管理UI
+- **非表示対象**: `active=false` または `showInDashboard=false` の行は管理者/上長ダッシュボードに表示しない
 
 ## よくあるエラー
 - 「ログインが必要です」: Workspaceログインが取得できていない

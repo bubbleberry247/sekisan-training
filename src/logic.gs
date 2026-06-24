@@ -20,8 +20,23 @@ function formatDate_(d, tz) {
   return Utilities.formatDate(d, tz, 'yyyy-MM-dd');
 }
 
-function parseDate_(str) {
-  return new Date(str);
+function dateOnlyUtcMs_(value, tz) {
+  var ymd = '';
+  if (value instanceof Date) {
+    ymd = Utilities.formatDate(value, tz || 'Asia/Tokyo', 'yyyy-MM-dd');
+  } else {
+    var raw = String(value || '').trim();
+    var match = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (match) {
+      ymd = match[1] + '-' + ('0' + match[2]).slice(-2) + '-' + ('0' + match[3]).slice(-2);
+    } else {
+      var parsed = new Date(raw);
+      if (!isNaN(parsed.getTime())) ymd = Utilities.formatDate(parsed, tz || 'Asia/Tokyo', 'yyyy-MM-dd');
+    }
+  }
+  if (!ymd) return NaN;
+  var parts = ymd.split('-').map(function(v) { return Number(v); });
+  return Date.UTC(parts[0], parts[1] - 1, parts[2]);
 }
 
 function parseUnlockWeek_(value) {
@@ -35,9 +50,10 @@ function parseUnlockWeek_(value) {
 }
 
 function weeksSinceStart_(startDateStr, tz) {
-  var start = parseDate_(startDateStr);
-  var now = getNow_();
-  var diff = now.getTime() - start.getTime();
+  var zone = tz || 'Asia/Tokyo';
+  var startMs = dateOnlyUtcMs_(startDateStr, zone);
+  var nowMs = dateOnlyUtcMs_(getNow_(), zone);
+  var diff = nowMs - startMs;
   var days = Math.floor(diff / (1000*60*60*24));
   // If before start date, return -1 (no test should be "this week's test")
   if (days < 0) return -1;
@@ -81,6 +97,13 @@ function getActiveEmail_() {
     email = '';
   }
   return String(email || '').trim();
+}
+
+function normalizeUserAccessBoolean_(value, defaultValue) {
+  if (value === true || value === false) return value ? 'true' : 'false';
+  var raw = String(value == null ? '' : value).trim().toLowerCase();
+  if (!raw) return defaultValue ? 'true' : 'false';
+  return (raw === 'false' || raw === '0' || raw === 'no') ? 'false' : 'true';
 }
 
 function getDirectoryProfile_(email) {
@@ -152,11 +175,12 @@ function getUserAccessByEmail_(email) {
         role: String(rows[i].role || 'user').toLowerCase(),
         managerEmail: String(rows[i].managerEmail || ''),
         active: active,
-        displayName: String(rows[i].displayName || '')
+        displayName: String(rows[i].displayName || ''),
+        showInDashboard: normalizeUserAccessBoolean_(rows[i].showInDashboard, true) !== 'false'
       };
     }
   }
-  return { email: email, role: 'user', managerEmail: '', active: false, displayName: '' };
+  return { email: email, role: 'user', managerEmail: '', active: false, displayName: '', showInDashboard: false };
 }
 
 function requireActiveUser_(userCtx) {
@@ -166,15 +190,21 @@ function requireActiveUser_(userCtx) {
   // Return a compatible access object (role defaults to 'user')
   var role = 'user';
   var managerRef = '';
+  var accessName = '';
+  var showInDashboard = true;
   // Try email first, then userKey (for non-Workspace users who have no email)
   var lookupKey = userCtx.email || userCtx.userKey;
   if (lookupKey) {
     var access = getUserAccessByEmail_(lookupKey);
+    if (!access || !access.active) {
+      throw new Error('このユーザーは無効です');
+    }
     if (access && access.role) role = access.role;
     if (access && access.managerEmail) managerRef = access.managerEmail;
-    if (access && access.displayName) var accessName = access.displayName;
+    if (access && access.displayName) accessName = access.displayName;
+    if (access && access.hasOwnProperty('showInDashboard')) showInDashboard = !!access.showInDashboard;
   }
-  return { email: userCtx.email || '', role: role, managerEmail: managerRef, active: true, displayName: accessName || userCtx.displayName || '' };
+  return { email: userCtx.email || '', role: role, managerEmail: managerRef, active: true, displayName: accessName || userCtx.displayName || '', showInDashboard: showInDashboard };
 }
 
 function requireAdmin_(userCtx) {
@@ -196,10 +226,27 @@ function getDirectReports_(managerEmail) {
       var rawActive = r.active;
       var active = true;
       if (rawActive === false || rawActive === 'false' || rawActive === 'FALSE' || rawActive === '0' || rawActive === 'no' || rawActive === 'No' || rawActive === 'NO') { active = false; }
+      if (normalizeUserAccessBoolean_(r.showInDashboard, true) === 'false') active = false;
       if (email && active) list.push(email);
     }
   });
   return list;
+}
+
+function ensureUserAccessSheetSchema_(sh) {
+  var expected = HEADERS[SHEETS.UserAccess];
+  var lastCol = Math.max(1, sh.getLastColumn());
+  var header = sh.getRange(1, 1, 1, lastCol).getValues()[0]
+    .map(function(h, i) { return normalizeHeader_(h, i); });
+  var changed = false;
+  expected.forEach(function(name) {
+    if (header.indexOf(name) >= 0) return;
+    sh.getRange(1, sh.getLastColumn() + 1).setValue(name);
+    header.push(name);
+    changed = true;
+  });
+  sh.setFrozenRows(1);
+  return { ok: true, changed: changed, headers: header };
 }
 
 function getUserAccessSheet_() {
@@ -208,6 +255,8 @@ function getUserAccessSheet_() {
   if (!sh) {
     sh = ss.insertSheet(SHEETS.UserAccess);
     setHeaders_(sh, HEADERS[SHEETS.UserAccess]);
+  } else {
+    ensureUserAccessSheetSchema_(sh);
   }
   return sh;
 }
@@ -227,9 +276,21 @@ function buildProgress_(attempts, totalTests, tz, weeksBack) {
     return a.status === 'submitted' && a.mode === 'test';
   });
   var submittedMap = {};
+  var completedByTest = {};
   submittedTests.forEach(function(a){
     if (a.testIndex !== '' && a.testIndex !== null && a.testIndex !== undefined) {
-      submittedMap[String(a.testIndex)] = true;
+      var key = String(a.testIndex);
+      submittedMap[key] = true;
+      var totalQ = Number(a.totalQuestions || 0);
+      var scorePct = totalQ > 0 ? Math.round(Number(a.scoreTotal || 0) / totalQ * 1000) / 10 : 0;
+      var submittedAt = String(a.submittedAt || a.startedAt || '');
+      var rec = completedByTest[key] || { completed: true, lastSubmittedAt: '', latestScorePct: 0, submitCount: 0 };
+      rec.submitCount += 1;
+      if (!rec.lastSubmittedAt || submittedAt >= String(rec.lastSubmittedAt || '')) {
+        rec.lastSubmittedAt = submittedAt;
+        rec.latestScorePct = scorePct;
+      }
+      completedByTest[key] = rec;
     }
   });
   var submittedUniqueCount = Object.keys(submittedMap).length;
@@ -285,6 +346,8 @@ function buildProgress_(attempts, totalTests, tz, weeksBack) {
     attemptsTotal: attempts.length,
     submittedTests: submittedUniqueCount,
     totalTests: totalTests,
+    submittedTestMap: submittedMap,
+    completedByTest: completedByTest,
     avgScore: avgScore,
     last7DaysCount: last7DaysCount,
     weekly: weekly,
@@ -341,7 +404,7 @@ function readQuestionBank_() {
 
 function isValidChoiceQuestion_(q) {
   var correct = String(q.correct || '').trim().toUpperCase();
-  var choiceE = String(q.choiceE || '').trim();
+  var choiceE = normalizeValue_(q.choiceE).trim();
   var choices = [q.choiceA, q.choiceB, q.choiceC, q.choiceD];
   for (var i = 0; i < choices.length; i++) {
     if (isBlank_(choices[i])) return false;
@@ -358,11 +421,11 @@ function isValidChoiceQuestion_(q) {
     }
   }
   var map = {
-    A: String(q.choiceA || '').trim(),
-    B: String(q.choiceB || '').trim(),
-    C: String(q.choiceC || '').trim(),
-    D: String(q.choiceD || '').trim(),
-    E: String(q.choiceE || '').trim()
+    A: normalizeValue_(q.choiceA).trim(),
+    B: normalizeValue_(q.choiceB).trim(),
+    C: normalizeValue_(q.choiceC).trim(),
+    D: normalizeValue_(q.choiceD).trim(),
+    E: normalizeValue_(q.choiceE).trim()
   };
   for (var p2 = 0; p2 < parts.length; p2++) {
     if (isBlank_(map[parts[p2]])) return false;
@@ -381,6 +444,101 @@ function getQuestionsByIdsFromBank_(ids, questionBank) {
   var list = [];
   ids.forEach(function(id){ if (map[id]) list.push(map[id]); });
   return list;
+}
+
+function sekisanYearSortValue_(year) {
+  var text = String(year || '').toUpperCase();
+  var m = text.match(/^R(\d+)$/);
+  if (m) return 100 + Number(m[1]);
+  m = text.match(/^H(\d+)$/);
+  if (m) return Number(m[1]);
+  return -1;
+}
+
+function sortSekisanYearsDesc_(years) {
+  return years.slice().sort(function(a, b) {
+    return sekisanYearSortValue_(b) - sekisanYearSortValue_(a);
+  });
+}
+
+function getSekisanQuestionTargetKeys_(q) {
+  var keys = {};
+  var seg = String(q.segmentId || '').trim();
+  if (seg) keys[seg] = true;
+  var parsed = parseSekisanQId_(q.qId);
+  if (parsed) {
+    var section = sekisanSectionFromNo_(parsed.number);
+    keys[parsed.year + 'sekisan'] = true;
+    if (section === 'I' || section === 'II') {
+      keys[parsed.year + 'sekisan_' + section] = true;
+      keys[parsed.year + '_sekisan_' + section] = true;
+      keys[parsed.year + '-' + section] = true;
+    }
+  }
+  return keys;
+}
+
+function parseSekisanRangeTarget_(token) {
+  var m = String(token || '').trim().match(/^range:((?:H|R)\d+)(sekisan)?:(\d+)-(\d+)$/);
+  if (!m) return null;
+  var from = Number(m[3]);
+  var to = Number(m[4]);
+  if (from > to) {
+    var tmp = from;
+    from = to;
+    to = tmp;
+  }
+  return { year: m[1].toUpperCase(), from: from, to: to };
+}
+
+function questionMatchesSekisanRangeTarget_(q, token) {
+  var target = parseSekisanRangeTarget_(token);
+  if (!target) return false;
+  var parsed = parseSekisanQId_(q.qId);
+  if (!parsed) return false;
+  var no = Number(parsed.number || 0);
+  return parsed.year === target.year && no >= target.from && no <= target.to;
+}
+
+function questionMatchesTargetSegments_(q, segs) {
+  if (!segs || segs.length === 0) return true;
+  var keys = getSekisanQuestionTargetKeys_(q);
+  for (var i = 0; i < segs.length; i++) {
+    var token = String(segs[i] || '').trim();
+    if (!token) continue;
+    if (questionMatchesSekisanRangeTarget_(q, token)) return true;
+    if (keys[token]) return true;
+  }
+  return false;
+}
+
+function getSekisanAvailableMockYearsFromBank_(questionBank) {
+  var stats = {};
+  (questionBank || []).forEach(function(q) {
+    if (q.status !== 'published' || !isValidChoiceQuestion_(q)) return;
+    var parsed = parseSekisanQId_(q.qId);
+    if (!parsed) return;
+    if (!stats[parsed.year]) {
+      stats[parsed.year] = {
+        code: parsed.year,
+        label: formatSekisanYear_(parsed.year),
+        totalQuestions: 0,
+        partIQuestions: 0,
+        partIIQuestions: 0
+      };
+    }
+    stats[parsed.year].totalQuestions += 1;
+    var section = sekisanSectionFromNo_(parsed.number);
+    if (section === 'I') stats[parsed.year].partIQuestions += 1;
+    if (section === 'II') stats[parsed.year].partIIQuestions += 1;
+  });
+  return sortSekisanYearsDesc_(Object.keys(stats)).map(function(year) {
+    return stats[year];
+  });
+}
+
+function getSekisanAvailableMockYears_() {
+  return getSekisanAvailableMockYearsFromBank_(readQuestionBank_());
 }
 
 function shuffle_(arr) {
@@ -422,7 +580,9 @@ function generateTestSet_(planRow, config) {
   // Redistribute unfilled ability slots to knowledge
   var actualKnowledgeCount = knowledgeCount + (abilityCount - abilityPicked.length);
 
-  var knowledgePool = qb.filter(function(q){ return q.type === 'knowledge' && segs.indexOf(q.segmentId) >= 0; });
+  var knowledgePool = qb.filter(function(q){
+    return q.type === 'knowledge' && questionMatchesTargetSegments_(q, segs);
+  });
   var revisionPool = knowledgePool.filter(function(q){ return String(q.revisionFlag) === '1'; });
 
   var picked = [];
@@ -608,13 +768,13 @@ function toQuestionForClient_lite_(q) {
 
 function buildChoices_(q) {
   var choices = [
-    { key: 'A', text: q.choiceA },
-    { key: 'B', text: q.choiceB },
-    { key: 'C', text: q.choiceC },
-    { key: 'D', text: q.choiceD }
+    { key: 'A', text: normalizeValue_(q.choiceA) },
+    { key: 'B', text: normalizeValue_(q.choiceB) },
+    { key: 'C', text: normalizeValue_(q.choiceC) },
+    { key: 'D', text: normalizeValue_(q.choiceD) }
   ];
   if (!isBlank_(q.choiceE)) {
-    choices.push({ key: 'E', text: q.choiceE });
+    choices.push({ key: 'E', text: normalizeValue_(q.choiceE) });
   }
   return choices;
 }
@@ -747,32 +907,208 @@ function computeFieldStats_(userKey) {
 }
 
 // Optimized: accepts pre-read QuestionBank and user's TagStats rows
-function computeFieldStatsFromRows_(userTagRows, questionBank) {
-  var FIELD_ORDER = [
-    { tag: 'Ⅰ建築一般', label: 'Ⅰ建築一般' },
-    { tag: 'Ⅱ数量積算', label: 'Ⅱ数量積算' }
+function getSekisanFieldDefinitions_() {
+  return [
+    {
+      tag: 'field_I_general_construction',
+      label: '建築一般・施工',
+      segmentId: 'sekisan_I',
+      zone: 1,
+      badge: '基礎',
+      description: '建築一般、構法、施工技術、材料の基本を確認します',
+      noFrom: 1,
+      noTo: 6,
+      pattern: '建築一般|構法|工法|施工|材料|標準的|特殊構法'
+    },
+    {
+      tag: 'field_I_production_contract',
+      label: '建築生産・契約',
+      segmentId: 'sekisan_I',
+      zone: 1,
+      badge: '契約',
+      description: '建築生産プロセス、発注、契約、設計図書を確認します',
+      noFrom: 7,
+      noTo: 10,
+      pattern: '建築生産|生産プロセス|発注|契約|設計図書'
+    },
+    {
+      tag: 'field_I_estimation_cost',
+      label: '積算業務・工事費',
+      segmentId: 'sekisan_I',
+      zone: 1,
+      badge: '積算',
+      description: '積算業務、内訳書、値入、工事費、市場価格を確認します',
+      noFrom: 11,
+      noTo: 19,
+      pattern: '建築積算|積算業務|工事費|値入|内訳|市場価格|概算|チェック|ICT|BIM'
+    },
+    {
+      tag: 'field_I_lcc_ve_renovation',
+      label: 'LCC・VE・改修',
+      segmentId: 'sekisan_I',
+      zone: 1,
+      badge: '応用',
+      description: 'LCC、VE、環境、改修、設備の積算を確認します',
+      noFrom: 20,
+      noTo: 25,
+      pattern: 'LCC|ライフサイクルコスト|VE|バリューエンジニアリング|環境|改修|設備'
+    },
+    {
+      tag: 'field_II_standard',
+      label: '数量積算基準',
+      segmentId: 'sekisan_II',
+      zone: 2,
+      badge: '基準',
+      description: '数量積算基準の総則と共通ルールを確認します',
+      noFrom: 26,
+      noTo: 28,
+      pattern: '数量積算基準|積算基準|総則'
+    },
+    {
+      tag: 'field_II_earthwork',
+      label: '土工・地業',
+      segmentId: 'sekisan_II',
+      zone: 2,
+      badge: '土工',
+      description: '土工、地業、根切などの数量積算を確認します',
+      noFrom: 29,
+      noTo: 29,
+      pattern: '土工|地業|根切'
+    },
+    {
+      tag: 'field_II_structure',
+      label: '躯体',
+      segmentId: 'sekisan_II',
+      zone: 2,
+      badge: '躯体',
+      description: 'コンクリート、鉄筋、鉄骨、型枠などの躯体系を確認します',
+      noFrom: 30,
+      noTo: 35,
+      pattern: '躯体|コンクリート|鉄筋|鉄骨|型枠'
+    },
+    {
+      tag: 'field_II_finish',
+      label: '仕上・建具',
+      segmentId: 'sekisan_II',
+      zone: 2,
+      badge: '仕上',
+      description: '仕上、建具、内外装、木材、間仕切を確認します',
+      noFrom: 36,
+      noTo: 40,
+      pattern: '仕上|建具|内外装|内部|木材|間仕切'
+    },
+    {
+      tag: 'field_II_equipment_renovation',
+      label: '設備・屋外・改修',
+      segmentId: 'sekisan_II',
+      zone: 2,
+      badge: '周辺',
+      description: '設備、屋外施設、改修工事などを確認します',
+      noFrom: 41,
+      noTo: 42,
+      pattern: '設備|屋外|改修'
+    },
+    {
+      tag: 'field_II_calculation',
+      label: '計算問題',
+      segmentId: 'sekisan_II',
+      zone: 2,
+      badge: '計算',
+      description: '数量計算、図面読み取り、計算根拠を集中的に反復します',
+      noFrom: 43,
+      noTo: 50,
+      pattern: '計算問題|計算'
+    },
+    {
+      tag: 'field_II_other',
+      label: '数量積算その他',
+      segmentId: 'sekisan_II',
+      zone: 2,
+      badge: '補足',
+      description: '上記に分類しきれない数量積算問題を確認します',
+      defaultSegment: true
+    }
   ];
+}
+
+function getSekisanMajorFieldSegmentId_(tag) {
+  var target = String(tag || '').trim();
+  if (target === 'Ⅰ建築一般' || target === 'sekisan_I') return 'sekisan_I';
+  if (target === 'Ⅱ数量積算' || target === 'sekisan_II') return 'sekisan_II';
+  return '';
+}
+
+function getSekisanFieldSegmentId_(tag) {
+  return getSekisanMajorFieldSegmentId_(tag);
+}
+
+function getSekisanFieldDefinitionByTag_(tag) {
+  var target = String(tag || '').trim();
+  var fields = getSekisanFieldDefinitions_();
+  for (var i = 0; i < fields.length; i++) {
+    if (fields[i].tag === target || fields[i].label === target) {
+      return fields[i];
+    }
+  }
+  return null;
+}
+
+function getSekisanQuestionTagText_(q) {
+  return [q.tag1, q.tag2, q.tag3, q.segmentId, q.source_ref].map(function(v) {
+    return String(v || '').trim();
+  }).join(' ');
+}
+
+function questionMatchesSekisanFieldDefinition_(q, def) {
+  if (!def) return false;
+  if (def.segmentId && String(q.segmentId || '').trim() !== def.segmentId) return false;
+  var parsed = parseSekisanQId_(q.qId);
+  if (parsed && def.noFrom && def.noTo) {
+    var no = Number(parsed.number || 0);
+    if (no >= Number(def.noFrom) && no <= Number(def.noTo)) return true;
+  }
+  if (def.defaultSegment) return true;
+  if (!def.pattern) return false;
+  return new RegExp(def.pattern).test(getSekisanQuestionTagText_(q));
+}
+
+function getSekisanFieldKeyForQuestion_(q) {
+  var fields = getSekisanFieldDefinitions_();
+  for (var i = 0; i < fields.length; i++) {
+    if (questionMatchesSekisanFieldDefinition_(q, fields[i])) return fields[i].tag;
+  }
+  return '';
+}
+
+function computeFieldStatsFromRows_(userTagRows, questionBank) {
+  var FIELD_ORDER = getSekisanFieldDefinitions_();
 
   var qb = questionBank.filter(function(q) {
     return q.status === 'published' && isValidChoiceQuestion_(q);
   });
-  var qCount = {};
+  var fieldCount = {};
   qb.forEach(function(q) {
-    var t = String(q.tag1 || '');
-    qCount[t] = (qCount[t] || 0) + 1;
+    var fieldKey = getSekisanFieldKeyForQuestion_(q);
+    if (!fieldKey) return;
+    fieldCount[fieldKey] = (fieldCount[fieldKey] || 0) + 1;
   });
 
   var tagMap = {};
   userTagRows.forEach(function(r) { tagMap[r.tag] = r; });
 
-  return FIELD_ORDER.map(function(f) {
-    var stat = tagMap[f.tag] || {};
+  return FIELD_ORDER.filter(function(f) {
+    return Number(fieldCount[f.tag] || 0) > 0;
+  }).map(function(f) {
+    var stat = tagMap[f.tag] || tagMap[f.label] || {};
     var answered = Number(stat.answeredCount || 0);
     var correct = Number(stat.correctCount || 0);
     return {
       tag: f.tag,
       label: f.label,
-      totalQuestions: qCount[f.tag] || 0,
+      zone: f.zone || 0,
+      badge: f.badge || '',
+      description: f.description || '',
+      totalQuestions: fieldCount[f.tag] || 0,
       answered: answered,
       accuracy: answered > 0 ? Math.round(correct / answered * 100) : null
     };
@@ -848,9 +1184,20 @@ function updateTagStats_(userKey, answerRows) {
   var now = formatDateTime_(getNow_(), 'Asia/Tokyo');
 
   answerRows.forEach(function(a){
+    var tags = [];
     ['tag1','tag2','tag3'].forEach(function(tk){
-      var tag = a[tk];
+      if (a[tk]) tags.push(a[tk]);
+    });
+    var fieldTag = sekisanSegmentLabel_(a.segmentId);
+    if (getSekisanFieldSegmentId_(fieldTag)) tags.push(fieldTag);
+    var fineFieldTag = getSekisanFieldKeyForQuestion_(a);
+    if (fineFieldTag) tags.push(fineFieldTag);
+
+    var seen = {};
+    tags.forEach(function(tag){
       if (!tag) return;
+      if (seen[tag]) return;
+      seen[tag] = true;
       var key = userKey + '::' + tag;
       var row = map[key];
       if (!row) {
@@ -1115,7 +1462,7 @@ function validateQuestionRow_(result, rowNum, obj, existingIds) {
     addError_(result, rowNum, 'status', 'Invalid status: ' + obj.status);
   }
 
-  var choiceE = String(obj.choiceE || '').trim();
+  var choiceE = normalizeValue_(obj.choiceE).trim();
   var hasE = !isBlank_(choiceE);
 
   var correct = String(obj.correct || '').trim().toUpperCase();
@@ -1137,11 +1484,11 @@ function validateQuestionRow_(result, rowNum, obj, existingIds) {
   }
   if (parts.length > 0) {
     var map = {
-      A: String(obj.choiceA || '').trim(),
-      B: String(obj.choiceB || '').trim(),
-      C: String(obj.choiceC || '').trim(),
-      D: String(obj.choiceD || '').trim(),
-      E: String(obj.choiceE || '').trim()
+      A: normalizeValue_(obj.choiceA).trim(),
+      B: normalizeValue_(obj.choiceB).trim(),
+      C: normalizeValue_(obj.choiceC).trim(),
+      D: normalizeValue_(obj.choiceD).trim(),
+      E: normalizeValue_(obj.choiceE).trim()
     };
     for (var p2 = 0; p2 < parts.length; p2++) {
       if (isBlank_(map[parts[p2]])) {
@@ -1183,6 +1530,7 @@ function computeNextAction_(unlocked, submittedMap, weakTags, next) {
       type: 'test',
       label: first.label,
       testIndex: first.testIndex,
+      unlockWeek: first.unlockWeek,
       targetSegments: first.targetSegments || '',
       questionsPerTest: first.questionsPerTest || 30,
       reason: '今週のテストです'

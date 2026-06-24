@@ -40,7 +40,10 @@ function apiLoginWithGoogle(idToken) {
       return { _error: true, message: 'Client IDが一致しません' };
     }
 
-    // 4. UserAccess でメール存在チェック（ホワイトリスト）
+    // 4. Bootstrap: スクリプト実行オーナーだけは初回ログイン時に管理者として復旧
+    ensureEffectiveUserInUserAccess_(email, name);
+
+    // 5. UserAccess でメール存在チェック（ホワイトリスト）
     var access = getUserAccessByEmail_(email);
     if (!access || !access.active) {
       return { _error: true, message: 'このアカウントは登録されていません。管理者にお問い合わせください。' };
@@ -65,6 +68,60 @@ function apiLoginWithGoogle(idToken) {
   } catch (e) {
     return { _error: true, message: 'Googleログインエラー: ' + String(e.message || e) };
   }
+}
+
+function ensureEffectiveUserInUserAccess_(email, displayName) {
+  try {
+    var effectiveEmail = '';
+    try { effectiveEmail = Session.getEffectiveUser().getEmail() || ''; } catch (sessionErr) {}
+    effectiveEmail = String(effectiveEmail || '').trim().toLowerCase();
+    var loginEmail = String(email || '').trim().toLowerCase();
+    if (!effectiveEmail || !loginEmail || effectiveEmail !== loginEmail) return;
+
+    var sh = getUserAccessSheet_();
+    var values = sh.getDataRange().getValues();
+    var headers = values.length > 0
+      ? values[0].map(function(h, idx) { return normalizeHeader_(h, idx); })
+      : HEADERS[SHEETS.UserAccess];
+    var roleCol = headers.indexOf('role');
+    var activeCol = headers.indexOf('active');
+    var updatedAtCol = headers.indexOf('updatedAt');
+    var displayNameCol = headers.indexOf('displayName');
+    var showCol = headers.indexOf('showInDashboard');
+    var now = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss');
+    var name = String(displayName || email.split('@')[0] || 'admin');
+
+    for (var i = 1; i < values.length; i++) {
+      if (String(values[i][0] || '').trim().toLowerCase() === loginEmail) {
+        if (roleCol >= 0 && !String(values[i][roleCol] || '').trim()) sh.getRange(i + 1, roleCol + 1).setValue('admin');
+        if (activeCol >= 0) sh.getRange(i + 1, activeCol + 1).setValue('TRUE');
+        if (updatedAtCol >= 0) sh.getRange(i + 1, updatedAtCol + 1).setValue(now);
+        if (displayNameCol >= 0 && !String(values[i][displayNameCol] || '').trim()) sh.getRange(i + 1, displayNameCol + 1).setValue(name);
+        if (showCol >= 0 && normalizeUserAccessBoolean_(values[i][showCol], true) !== 'false') sh.getRange(i + 1, showCol + 1).setValue('FALSE');
+        SpreadsheetApp.flush();
+        return;
+      }
+    }
+
+    appendRows_(sh, [[loginEmail, 'admin', '', 'TRUE', now, name, 'FALSE']]);
+    SpreadsheetApp.flush();
+  } catch (e) {
+    Logger.log('[ensureEffectiveUserInUserAccess_] ' + String(e.message || e));
+  }
+}
+
+function ADMIN_bootstrapCurrentUserAccess() {
+  var email = '';
+  try { email = Session.getActiveUser().getEmail() || ''; } catch (activeErr) {}
+  if (!email) {
+    try { email = Session.getEffectiveUser().getEmail() || ''; } catch (effectiveErr) {}
+  }
+  email = String(email || '').trim().toLowerCase();
+  if (!email) {
+    throw new Error('GAS実行ユーザーのメールアドレスを取得できませんでした');
+  }
+  ensureEffectiveUserInUserAccess_(email, email.split('@')[0]);
+  return { ok: true, emailConfigured: true };
 }
 
 /**
@@ -105,6 +162,25 @@ function getAppExecUrl_() {
   }
 
   return configuredUrl || '';
+}
+
+function createIndexHtmlOutput_(title, serverAuthResult) {
+  var template = HtmlService.createTemplateFromFile('index');
+  template.serverAuthResult = toSafeTemplateJson_(serverAuthResult || null);
+  template.appExecUrlJson = toSafeTemplateJson_(getAppExecUrl_());
+  return template.evaluate()
+    .setTitle(title || APP_TITLE_)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+function toSafeTemplateJson_(value) {
+  return JSON.stringify(value)
+    .replace(/</g, String.fromCharCode(92) + 'u003c')
+    .replace(/>/g, String.fromCharCode(92) + 'u003e')
+    .replace(/&/g, String.fromCharCode(92) + 'u0026')
+    .replace(/\u2028/g, String.fromCharCode(92) + 'u2028')
+    .replace(/\u2029/g, String.fromCharCode(92) + 'u2029');
 }
 
 function getOAuthStartUrl_() {
@@ -174,18 +250,13 @@ function handleManualLogin_(email) {
     return errorPage_('このアカウントは登録されていません: ' + email);
   }
   var user = ensureUser_(email, email, access.displayName || email.split('@')[0]);
-  var template = HtmlService.createTemplateFromFile('index');
-  template.serverAuthResult = JSON.stringify({
+  return createIndexHtmlOutput_(APP_TITLE_, {
     userKey: user.userKey,
     displayName: access.displayName || user.displayName,
     email: email,
-    role: access.role || 'user'
-  }).replace(/</g, String.fromCharCode(92) + 'u003c');
-  template.appExecUrl = getAppExecUrl_();
-  return template.evaluate()
-    .setTitle(APP_TITLE_)
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    role: access.role || 'user',
+    showInDashboard: !!access.showInDashboard
+  });
 }
 
 function handleOAuthCallback_(code, state) {
@@ -198,13 +269,7 @@ function handleOAuthCallback_(code, state) {
       var wasDone = cache.get('oauth_done_' + state);
       if (wasDone) {
         logOAuthError_('state_consumed', 'reload after success: ' + state);
-        var template = HtmlService.createTemplateFromFile('index');
-        template.serverAuthResult = '';
-        template.appExecUrl = getAppExecUrl_();
-        return template.evaluate()
-          .setTitle(APP_TITLE_)
-          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-          .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+        return createIndexHtmlOutput_(APP_TITLE_);
       }
       logOAuthError_('state_invalid', 'state not found in cache: ' + state);
       return errorPage_('認証エラー: リクエストが無効または期限切れです');
@@ -258,18 +323,12 @@ function handleOAuthCallback_(code, state) {
       saveGoogleSub_(loginResult.userKey, idPayload.sub);
     }
 
-    var template = HtmlService.createTemplateFromFile('index');
-    template.serverAuthResult = JSON.stringify({
+    return createIndexHtmlOutput_(APP_TITLE_, {
       userKey: loginResult.userKey,
       displayName: loginResult.displayName,
       email: loginResult.email,
       role: loginResult.role
-    }).replace(/</g, String.fromCharCode(92) + 'u003c');
-    template.appExecUrl = getAppExecUrl_();
-    return template.evaluate()
-      .setTitle(APP_TITLE_)
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    });
   } catch (e) {
     logOAuthError_('callback_error', String(e.message || e));
     return errorPage_('認証処理中にエラーが発生しました。しばらくしてから再度お試しください。');

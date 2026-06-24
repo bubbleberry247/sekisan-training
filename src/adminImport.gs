@@ -3,8 +3,8 @@
  * GASエディタから▶実行するだけでOK
  */
 
-/** 土木: GASエディタで▶実行 */
-function ADMIN_importDoboku() {
+/** 建築積算士: GASエディタで▶実行 */
+function ADMIN_importSekisan() {
   var fileId = '1mPp0JpnSV21G-9cKHsXFOKDp4WzrkLp1';
   var url = 'https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media';
   var token = ScriptApp.getOAuthToken();

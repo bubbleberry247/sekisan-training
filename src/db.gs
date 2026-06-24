@@ -23,7 +23,7 @@ HEADERS[SHEETS.QuestionBank] = [
   'explainA', 'explainB', 'explainC', 'explainD', 'explainE',
   'correct', 'explainShort', 'explainLong', 'status', 'updatedAt'
 ];
-HEADERS[SHEETS.UserAccess] = ['email', 'role', 'managerEmail', 'active', 'updatedAt', 'displayName'];
+HEADERS[SHEETS.UserAccess] = ['email', 'role', 'managerEmail', 'active', 'updatedAt', 'displayName', 'showInDashboard'];
 HEADERS[SHEETS.TestPlan14] = [
   'testIndex', 'label', 'targetSegments', 'questionsPerTest',
   'abilityCount', 'revisionMinCount', 'unlockWeek', 'notes'
@@ -218,6 +218,7 @@ function setup_(force) {
   initConfig_();
   initTestPlan_();
   initSampleData_();
+  syncDashboardRosterForCurrentApp_();
 
   return { status: 'created', id: ss.getId(), url: ss.getUrl() };
 }
@@ -232,23 +233,7 @@ function setupForce() {
 
 function initConfig_() {
   var sh = getSheet_(SHEETS.Config);
-  var rows = [
-    ['PROGRAM_START_DATE', '2026-04-11'],
-    ['EXAM_DATE', ''],
-    ['TIME_LIMIT_MINUTES', '30'],
-    ['QUESTIONS_PER_TEST', '20'],
-    ['ABILITY_PER_TEST', '0'],
-    ['MINI_TIME_LIMIT_MINUTES', '15'],
-    ['MINI_QUESTIONS_PER_TEST', '10'],
-    ['MINI_ABILITY_PER_TEST', '0'],
-    ['TRAIN_TIME_LIMIT_MINUTES', '10'],
-    ['TRAIN_QUESTIONS_PER_TEST', '10'],
-    ['TRAIN_ABILITY_PER_TEST', '0'],
-    ['MOCK_TIME_LIMIT_MINUTES', '120'],
-    ['REVISION_RATIO', '0.2'],
-    ['SHARED_TESTSET_MODE', 'ON'],
-    ['TIMEZONE', 'Asia/Tokyo']
-  ];
+  var rows = getSekisan2026ConfigRows_();
   appendRows_(sh, rows);
 }
 
@@ -274,27 +259,45 @@ function updateConfigValue_(key, newValue) {
 
 // 試験日を修正する一時関数
 function fixExamDate_() {
-  updateConfigValue_('EXAM_DATE', '');
-  Logger.log('試験日を空欄に更新しました');
+  updateConfigValue_('PROGRAM_START_DATE', SEKISAN_2026_PROGRAM_START_DATE_);
+  updateConfigValue_('EXAM_DATE', SEKISAN_2026_EXAM_DATE_);
+  Logger.log('試験日を2026年度建築積算士一次試験日へ更新しました');
 }
 
 function initTestPlan_() {
   var sh = getSheet_(SHEETS.TestPlan14);
-  var plan = [
-    [1, '第1回 Ⅰ建築一般 ウォームアップ', 'sekisan_I', 20, 0, 2, 0, '基礎用語と出題形式に慣れる回'],
-    [2, '第2回 Ⅰ建築一般 実践1', 'sekisan_I', 20, 0, 2, 1, '建築一般の頻出テーマを反復'],
-    [3, '第3回 Ⅰ建築一般 実践2', 'sekisan_I', 20, 0, 2, 2, '苦手論点の洗い出し'],
-    [4, '第4回 Ⅰ建築一般 仕上げ', 'sekisan_I', 20, 0, 2, 3, 'Ⅰ分野の総合確認'],
-    [5, '第5回 Ⅱ数量積算 ウォームアップ', 'sekisan_II', 20, 0, 2, 4, '積算の基本ルールを整理'],
-    [6, '第6回 Ⅱ数量積算 実践1', 'sekisan_II', 20, 0, 2, 5, '数量積算の頻出論点を反復'],
-    [7, '第7回 Ⅱ数量積算 実践2', 'sekisan_II', 20, 0, 2, 6, '計算と判断の精度を上げる'],
-    [8, '第8回 Ⅱ数量積算 仕上げ', 'sekisan_II', 20, 0, 2, 7, 'Ⅱ分野の総合確認'],
-    [9, '第9回 総合演習 1', 'sekisan_I,sekisan_II', 25, 0, 3, 8, '全範囲の横断演習'],
-    [10, '第10回 総合演習 2', 'sekisan_I,sekisan_II', 25, 0, 3, 9, '本試験ペースの確認'],
-    [11, '第11回 総合演習 3', 'sekisan_I,sekisan_II', 25, 0, 3, 10, '頻出分野の取りこぼし防止'],
-    [12, '第12回 総合演習 4', 'sekisan_I,sekisan_II', 25, 0, 3, 11, '直前総仕上げ']
-  ];
+  var plan = getSekisan2026TestPlanRows_();
   appendRows_(sh, plan);
+}
+
+function syncSekisan2026Schedule_() {
+  var configRows = getSekisan2026ConfigRows_();
+  configRows.forEach(function(row) {
+    updateConfigValue_(row[0], row[1]);
+  });
+
+  var planRows = getSekisan2026TestPlanRows_();
+  var planSheet = getSheet_(SHEETS.TestPlan14);
+  planSheet.clear();
+  setHeaders_(planSheet, HEADERS[SHEETS.TestPlan14]);
+  appendRows_(planSheet, planRows);
+
+  var clearedTestSets = 0;
+  var testSetsSheet = getSheet_(SHEETS.TestSets);
+  var lastRow = testSetsSheet.getLastRow();
+  if (lastRow > 1) {
+    clearedTestSets = lastRow - 1;
+    testSetsSheet.getRange(2, 1, clearedTestSets, testSetsSheet.getLastColumn()).clearContent();
+  }
+  try { clearAllCache_(); } catch (e) {}
+
+  return {
+    ok: true,
+    programStartDate: SEKISAN_2026_PROGRAM_START_DATE_,
+    examDate: SEKISAN_2026_EXAM_DATE_,
+    testPlanCount: planRows.length,
+    clearedTestSets: clearedTestSets
+  };
 }
 
 function initSampleData_() {
@@ -351,6 +354,50 @@ var CACHE_TTL_CONFIG = 300;      // 5 minutes
 var CACHE_TTL_TESTPLAN = 300;    // 5 minutes
 var CACHE_TTL_QUESTIONS = 3600;  // 1 hour (was 10min)   // 10 minutes
 
+var SEKISAN_2026_PROGRAM_START_DATE_ = '2026-07-01';
+var SEKISAN_2026_EXAM_DATE_ = '2026-10-25';
+
+function getSekisan2026ConfigRows_() {
+  return [
+    ['PROGRAM_START_DATE', SEKISAN_2026_PROGRAM_START_DATE_],
+    ['EXAM_DATE', SEKISAN_2026_EXAM_DATE_],
+    ['TIME_LIMIT_MINUTES', '30'],
+    ['QUESTIONS_PER_TEST', '10'],
+    ['ABILITY_PER_TEST', '0'],
+    ['MINI_TIME_LIMIT_MINUTES', '15'],
+    ['MINI_QUESTIONS_PER_TEST', '10'],
+    ['MINI_ABILITY_PER_TEST', '0'],
+    ['TRAIN_TIME_LIMIT_MINUTES', '10'],
+    ['TRAIN_QUESTIONS_PER_TEST', '10'],
+    ['TRAIN_ABILITY_PER_TEST', '0'],
+    ['MOCK_TIME_LIMIT_MINUTES', '180'],
+    ['REVISION_RATIO', '0.2'],
+    ['SHARED_TESTSET_MODE', 'ON'],
+    ['TIMEZONE', 'Asia/Tokyo']
+  ];
+}
+
+function getSekisan2026TestPlanRows_() {
+  return [
+    [1, '第1回 R7 問1〜10', 'range:R7sekisan:1-10', 10, 0, 0, 0, '直近3年150問を週10問で回す'],
+    [2, '第2回 R7 問11〜20', 'range:R7sekisan:11-20', 10, 0, 0, 1, ''],
+    [3, '第3回 R7 問21〜30', 'range:R7sekisan:21-30', 10, 0, 0, 2, ''],
+    [4, '第4回 R7 問31〜40', 'range:R7sekisan:31-40', 10, 0, 0, 3, ''],
+    [5, '第5回 R7 問41〜50', 'range:R7sekisan:41-50', 10, 0, 0, 4, ''],
+    [6, '第6回 R6 問1〜10', 'range:R6sekisan:1-10', 10, 0, 0, 5, ''],
+    [7, '第7回 R6 問11〜20', 'range:R6sekisan:11-20', 10, 0, 0, 6, ''],
+    [8, '第8回 R6 問21〜30', 'range:R6sekisan:21-30', 10, 0, 0, 7, ''],
+    [9, '第9回 R6 問31〜40', 'range:R6sekisan:31-40', 10, 0, 0, 8, ''],
+    [10, '第10回 R6 問41〜50', 'range:R6sekisan:41-50', 10, 0, 0, 9, ''],
+    [11, '第11回 R5 問1〜10', 'range:R5sekisan:1-10', 10, 0, 0, 10, ''],
+    [12, '第12回 R5 問11〜20', 'range:R5sekisan:11-20', 10, 0, 0, 11, ''],
+    [13, '第13回 R5 問21〜30', 'range:R5sekisan:21-30', 10, 0, 0, 12, ''],
+    [14, '第14回 R5 問31〜40', 'range:R5sekisan:31-40', 10, 0, 0, 13, ''],
+    [15, '第15回 R5 問41〜50', 'range:R5sekisan:41-50', 10, 0, 0, 14, ''],
+    [16, '第16回 直近3年 直前復習', 'range:R7sekisan:1-50,range:R6sekisan:1-50,range:R5sekisan:1-50', 10, 0, 0, 15, '試験日を含む週は新規問題に使わず、前週を直前復習にする']
+  ];
+}
+
 function getCache_() {
   return CacheService.getScriptCache();
 }
@@ -400,16 +447,19 @@ function getCachedTestPlan_() {
 // Script-scope cache for full QuestionBank (avoids 100KB CacheService limit)
 var _questionsCache = null;
 var _questionsCacheTs = 0;
+var _questionsCacheBust = '';
 
 function getCachedQuestions_() {
+  var cache = getCache_();
+  var cacheBust = cache.get('questions_cache_bust') || '';
+
   // 1. Script-scope cache (instant, same execution)
   var now = Date.now();
-  if (_questionsCache && (now - _questionsCacheTs) < CACHE_TTL_QUESTIONS * 1000) {
+  if (_questionsCache && _questionsCacheBust === cacheBust && (now - _questionsCacheTs) < CACHE_TTL_QUESTIONS * 1000) {
     return _questionsCache;
   }
 
   // 2. CacheService flag check (cross-execution, lightweight)
-  var cache = getCache_();
   var cacheVersion = cache.get('questions_version');
 
   // 3. Read from sheet
@@ -433,6 +483,7 @@ function getCachedQuestions_() {
   // Store in script-scope (no size limit)
   _questionsCache = rows;
   _questionsCacheTs = now;
+  _questionsCacheBust = cacheBust;
 
   // Store lightweight version marker in CacheService
   try { cache.put('questions_version', String(now), CACHE_TTL_QUESTIONS); } catch(e) {}
@@ -442,5 +493,9 @@ function getCachedQuestions_() {
 function clearAllCache_() {
   var cache = getCache_();
   cache.removeAll(['config_map', 'testplan_rows', 'questions_list']);
+  cache.put('questions_cache_bust', String(Date.now()), CACHE_TTL_QUESTIONS);
+  _questionsCache = null;
+  _questionsCacheTs = 0;
+  _questionsCacheBust = '';
 }
 

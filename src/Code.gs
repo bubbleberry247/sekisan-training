@@ -10,7 +10,11 @@ function warmUp() {
 function doGet(e) {
   // 0. 診断エンドポイント（?diag=oauth）
   var diag = (e && e.parameter) ? e.parameter.diag : '';
-  if (diag === 'oauth') { return diagOAuth_(); }
+  if (diag === 'oauth') {
+    var oauthDiagAuthError = requireMaintenanceKey_(e);
+    if (oauthDiagAuthError) return oauthDiagAuthError;
+    return diagOAuth_();
+  }
 
   // 1. OAuth error（Google が error パラメータで返す場合）
   var oauthError = (e && e.parameter) ? e.parameter.error : '';
@@ -110,16 +114,31 @@ function doGet(e) {
     var allowedActions = {
       "diagWeek": true, "diagTestGen": true, "diagMock": true,
       "diagFieldStats": true, "diagWeekly": true, "diagStem": true,
+      "diagQuestionCoverage": true,
       "warmUp": true, "checkUserAccess": true, "clearCache": true,
       "getImportFolderUrl": true, "clearTestSets": true,
-      "clearStaleAttempts": true, "resetTestPlan": true,
+      "clearStaleAttempts": true, "resetTestPlan": true, "syncSchedule": true,
       "updateConfig": true, "linkImages": true, "linkGitHub": true,
       "importCsvFromFolder": true, "createImageFolder": true,
+      "diagDashboard": true,
+      "bootstrapAdmin": true,
+      "syncRoster": true,
       "setupDb": true, "autoTag": true
     };
     if (!allowedActions[action]) {
       return ContentService.createTextOutput(JSON.stringify({ ok: false, error: "Action not allowed via GET: " + action }))
         .setMimeType(ContentService.MimeType.JSON);
+    }
+    var maintenanceActions = {
+      "setupDb": true, "clearStaleAttempts": true, "autoTag": true,
+      "createImageFolder": true, "clearTestSets": true, "clearCache": true,
+      "resetTestPlan": true, "linkGitHub": true, "updateConfig": true,
+      "linkImages": true, "importCsvFromFolder": true, "getImportFolderUrl": true,
+      "checkUserAccess": true, "diagWeekly": true
+    };
+    if (maintenanceActions[action]) {
+      var maintenanceAuthError = requireMaintenanceKey_(e);
+      if (maintenanceAuthError) return maintenanceAuthError;
     }
   }
 
@@ -167,7 +186,7 @@ function doGet(e) {
       var published = qb.filter(function(q){ return q.status === 'published'; });
       var valid = published.filter(function(q){ return isValidChoiceQuestion_(q); });
       var segs = plan ? String(plan.targetSegments || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean) : [];
-      var segMatch = valid.filter(function(q){ return q.type === 'knowledge' && segs.indexOf(q.segmentId) >= 0; });
+      var segMatch = valid.filter(function(q){ return q.type === 'knowledge' && questionMatchesTargetSegments_(q, segs); });
       var abilityMatch = valid.filter(function(q){ return q.type === 'ability'; });
       // Type breakdown
       var types = {};
@@ -197,6 +216,20 @@ function doGet(e) {
     }
   }
 
+  if (action === 'diagQuestionCoverage') {
+    if (loginKey !== APP_DIAG_KEY_) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'key required' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    try {
+      return ContentService.createTextOutput(JSON.stringify(diagQuestionCoverage_()))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: err.message, stack: err.stack }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
   if (action === 'clearTestSets') {
     var sh = getSheet_(SHEETS.TestSets);
     var rows = sh.getDataRange().getValues();
@@ -219,7 +252,7 @@ function doGet(e) {
     clearAllCache_();
     var config = getConfigMap_();
     var tz = getConfigValue_(config, 'TIMEZONE', 'Asia/Tokyo');
-    var startDate = getConfigValue_(config, 'PROGRAM_START_DATE', '2026-04-11');
+    var startDate = getConfigValue_(config, 'PROGRAM_START_DATE', SEKISAN_2026_PROGRAM_START_DATE_);
     var weeks = weeksSinceStart_(startDate, tz);
     var now = new Date();
     var plans = getTestPlanRows_();
@@ -246,10 +279,24 @@ function doGet(e) {
       sh.clear();
       setHeaders_(sh, HEADERS[SHEETS.TestPlan14]);
       initTestPlan_();
-      return ContentService.createTextOutput(JSON.stringify({ ok: true, message: 'TestPlan14 reset to sekisan defaults (12 tests)' }))
+      return ContentService.createTextOutput(JSON.stringify({ ok: true, message: 'TestPlan14 reset to sekisan 2026 defaults (16 weekly tests)' }))
         .setMimeType(ContentService.MimeType.JSON);
     } catch (err) {
       return ContentService.createTextOutput(JSON.stringify({ ok: false, error: err.message }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  if (action === 'syncSchedule') {
+    if (loginKey !== APP_DIAG_KEY_) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'key required' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    try {
+      return ContentService.createTextOutput(JSON.stringify(syncSekisan2026Schedule_()))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: err.message, stack: err.stack }))
         .setMimeType(ContentService.MimeType.JSON);
     }
   }
@@ -262,6 +309,100 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     } catch (err) {
       return ContentService.createTextOutput(JSON.stringify({ ok: false, error: err.message, stack: err.stack }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  if (action === 'diagDashboard') {
+    if (loginKey !== APP_DIAG_KEY_) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'key required' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    try {
+      var dashboardConfig = getConfigMap_();
+      var dashboardTz = getConfigValue_(dashboardConfig, 'TIMEZONE', 'Asia/Tokyo');
+      var dashboardPlans = getTestPlanRows_();
+      var accessSheet = getUserAccessSheet_();
+      var accessHeaders = accessSheet.getRange(1, 1, 1, accessSheet.getLastColumn()).getValues()[0]
+        .map(function(h, i) { return normalizeHeader_(h, i); });
+      var accessRows = readRecords_(accessSheet);
+      var userRows = readRecords_(getSheet_(SHEETS.Users));
+      var attemptRows = readRecords_(getSheet_(SHEETS.Attempts));
+      var adminResult = buildTeamProgressSummary_(accessRows, userRows, attemptRows, dashboardPlans.length, dashboardTz, {
+        role: 'admin',
+        email: ''
+      });
+      var managerRows = accessRows.filter(function(r) {
+        return String(r.role || '').toLowerCase() === 'manager'
+          && normalizeUserAccessBoolean_(r.active, true) !== 'false'
+          && normalizeUserAccessBoolean_(r.showInDashboard, true) !== 'false';
+      });
+      var managerResult = { team: [], warnings: [] };
+      var directReportCount = 0;
+      if (managerRows.length > 0) {
+        var managerEmail = String(managerRows[0].email || '').toLowerCase();
+        directReportCount = accessRows.filter(function(r) {
+          return String(r.managerEmail || '').toLowerCase() === managerEmail
+            && normalizeUserAccessBoolean_(r.active, true) !== 'false'
+            && normalizeUserAccessBoolean_(r.showInDashboard, true) !== 'false';
+        }).length;
+        managerResult = buildTeamProgressSummary_(accessRows, userRows, attemptRows, dashboardPlans.length, dashboardTz, {
+          role: 'manager',
+          email: managerEmail
+        });
+      }
+      return ContentService.createTextOutput(JSON.stringify({
+        ok: true,
+        userAccess: {
+          totalRows: accessRows.length,
+          headers: accessHeaders,
+          hasShowInDashboard: accessHeaders.indexOf('showInDashboard') >= 0
+        },
+        users: { totalRows: userRows.length },
+        attempts: { totalRows: attemptRows.length },
+        plans: { totalRows: dashboardPlans.length },
+        adminTeam: {
+          visibleCount: adminResult.team.length,
+          warningCount: adminResult.warnings.length
+        },
+        managerSample: {
+          managerExists: managerRows.length > 0,
+          directReportCount: directReportCount,
+          visibleCount: managerResult.team.length,
+          warningCount: managerResult.warnings.length
+        }
+      })).setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: err.message, stack: err.stack }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  if (action === 'syncRoster') {
+    if (loginKey !== APP_DIAG_KEY_) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'key required' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    try {
+      return ContentService.createTextOutput(JSON.stringify(syncDashboardRosterForCurrentApp_()))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: err.message, stack: err.stack }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  if (action === 'bootstrapAdmin') {
+    if (loginKey !== APP_DIAG_KEY_) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'key required' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    try {
+      ADMIN_bootstrapCurrentUserAccess();
+      return ContentService.createTextOutput(JSON.stringify({ ok: true, emailConfigured: true }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: err.message }))
         .setMimeType(ContentService.MimeType.JSON);
     }
   }
@@ -365,6 +506,10 @@ function doGet(e) {
 
   if (action === 'diagStem') {
     var doFix = (e && e.parameter && e.parameter.fix === 'true');
+    if (doFix) {
+      var stemFixAuthError = requireMaintenanceKey_(e);
+      if (stemFixAuthError) return stemFixAuthError;
+    }
     try {
       var result = diagFixQuestionBank_(doFix);
       return ContentService.createTextOutput(JSON.stringify(result))
@@ -395,20 +540,22 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
-  // 通常ページ表示（OAuth 用テンプレート変数を渡す）
-  var template = HtmlService.createTemplateFromFile('index');
-  template.serverAuthResult = '';
-  template.appExecUrl = getAppExecUrl_();
-  return template.evaluate()
-    .setTitle(APP_SHORT_TITLE_)
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  return createIndexHtmlOutput_(APP_SHORT_TITLE_);
 }
 
 function doPost(e) {
   try {
     var body = JSON.parse(e.postData.contents);
     var action = body.action || '';
+    var writePostActions = {
+      uploadImage: true,
+      updateQuestionBank: true,
+      importCsvText: true
+    };
+    if (writePostActions[action]) {
+      var postAuthError = requireMaintenanceKeyFromBody_(body);
+      if (postAuthError) return postAuthError;
+    }
 
     if (action === 'uploadImage') {
       var folderId = body.folderId;
@@ -488,6 +635,36 @@ function doPost(e) {
   }
 }
 
+function requireMaintenanceKey_(e) {
+  var supplied = '';
+  if (e && e.parameter) {
+    supplied = String(
+      e.parameter.maintenanceKey ||
+      e.parameter.adminKey ||
+      e.parameter.diagKey ||
+      e.parameter.key ||
+      ''
+    ).trim();
+  }
+  if (supplied !== APP_DIAG_KEY_) {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'Unauthorized' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  return null;
+}
+
+function requireMaintenanceKeyFromBody_(body) {
+  var supplied = String(
+    (body && (body.maintenanceKey || body.adminKey || body.diagKey || body.key)) ||
+    ''
+  ).trim();
+  if (supplied !== APP_DIAG_KEY_) {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'Unauthorized' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  return null;
+}
+
 function diagMock_() {
   var qb = readRecords_(getSheet_(SHEETS.QuestionBank));
   var attempts = readRecords_(getSheet_(SHEETS.Attempts));
@@ -549,6 +726,48 @@ function diagMock_() {
     activeAttempts: activeAttempts,
     totalQuestions: qb.length,
     totalAttempts: attempts.length
+  };
+}
+
+function diagQuestionCoverage_() {
+  var qb = readRecords_(getSheet_(SHEETS.QuestionBank));
+  var required = ['qId', 'stem', 'choiceA', 'choiceB', 'choiceC', 'choiceD', 'correct', 'explainShort'];
+  var optional = ['choiceE', 'explainLong', 'explainA', 'explainB', 'explainC', 'explainD', 'explainE'];
+  var blankRequired = {};
+  var blankOptional = {};
+  required.forEach(function(k) { blankRequired[k] = 0; });
+  optional.forEach(function(k) { blankOptional[k] = 0; });
+  var samples = [];
+  var statusCounts = {};
+  var yearCounts = {};
+  var segmentCounts = {};
+  qb.forEach(function(q) {
+    var status = String(q.status || '');
+    statusCounts[status || '(blank)'] = (statusCounts[status || '(blank)'] || 0) + 1;
+    var qId = String(q.qId || '');
+    var year = (qId.match(/^((?:H|R)\d+)sekisan-/) || [])[1] || '(unknown)';
+    yearCounts[year] = (yearCounts[year] || 0) + 1;
+    var segment = String(q.segmentId || '(blank)');
+    segmentCounts[segment] = (segmentCounts[segment] || 0) + 1;
+    required.forEach(function(k) {
+      if (isBlank_(q[k])) {
+        blankRequired[k] += 1;
+        if (samples.length < 20) samples.push({ qId: qId, field: k });
+      }
+    });
+    optional.forEach(function(k) {
+      if (isBlank_(q[k])) blankOptional[k] += 1;
+    });
+  });
+  return {
+    ok: true,
+    totalQuestions: qb.length,
+    statusCounts: statusCounts,
+    yearCounts: yearCounts,
+    segmentCounts: segmentCounts,
+    blankRequired: blankRequired,
+    blankOptional: blankOptional,
+    missingRequiredSamples: samples
   };
 }
 
@@ -614,6 +833,7 @@ function setupImageFolder_() {
 // Run from GAS editor: update QuestionBank imageUrl to GitHub raw URLs
 function linkGitHubImages_() {
   var BASE = getSekisanGitHubImageBaseUrl_();
+  var imageFileMap = getSekisanGitHubImageFileMap_();
 
   var sh = getSheet_(SHEETS.QuestionBank);
   var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
@@ -634,6 +854,7 @@ function linkGitHubImages_() {
   var imgRange = sh.getRange(2, imgCol + 1, data.length - 1, 1);
   var imgValues = imgRange.getValues();
   var updated = 0;
+  var cleared = 0;
   for (var i = 1; i < data.length; i++) {
     var qId = String(data[i][qIdCol] || '').trim();
     var prev = String(imgValues[i - 1][0] || '').trim();
@@ -643,6 +864,13 @@ function linkGitHubImages_() {
     if (!imageName) continue;
     if (prev && prev.indexOf('images/sekisan/') !== 0 && prev.indexOf('raw.githubusercontent.com') === -1) continue;
     var url = BASE + imageName + '.png';
+    if (!imageFileMap[imageName + '.png']) {
+      if (prev) {
+        imgValues[i - 1][0] = '';
+        cleared++;
+      }
+      continue;
+    }
     if (prev === url) continue;
     imgValues[i - 1][0] = url;
     updated++;
@@ -650,8 +878,28 @@ function linkGitHubImages_() {
   if (updated > 0) {
     imgRange.setValues(imgValues);
   }
-  Logger.log('Updated ' + updated + ' imageUrl entries');
-  return { ok: true, updated: updated, baseUrl: BASE };
+  Logger.log('Updated ' + updated + ' imageUrl entries, cleared ' + cleared);
+  return { ok: true, updated: updated, cleared: cleared, availableImages: Object.keys(imageFileMap).length, baseUrl: BASE };
+}
+
+function getSekisanGitHubImageFileMap_() {
+  var apiUrl = 'https://api.github.com/repos/bubbleberry247/sekisan-training/contents/images/sekisan?ref=main';
+  var response = UrlFetchApp.fetch(apiUrl, {
+    muteHttpExceptions: true,
+    headers: { 'Accept': 'application/vnd.github+json' }
+  });
+  if (response.getResponseCode() !== 200) {
+    throw new Error('GitHub画像一覧の取得に失敗しました: HTTP ' + response.getResponseCode());
+  }
+  var files = JSON.parse(response.getContentText());
+  var map = {};
+  files.forEach(function(file) {
+    var name = String(file && file.name || '');
+    if (/^sekisan_((?:H|R)\d+)_(\d{3})\.png$/i.test(name)) {
+      map[name] = true;
+    }
+  });
+  return map;
 }
 
 // Run from GAS editor or via ?action=diagStem[&fix=true]

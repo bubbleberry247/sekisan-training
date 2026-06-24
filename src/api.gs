@@ -27,7 +27,59 @@ function isClientAuthErrorMessage_(message) {
     || msg.indexOf('permission') >= 0
     || msg.indexOf('not logged in') >= 0
     || msg.indexOf('not authorized') >= 0
+    || msg.indexOf('登録されていません') >= 0
+    || msg.indexOf('無効') >= 0
     || msg.indexOf('Client ID') >= 0;
+}
+
+function buildTeamProgressSummary_(accessRows, userRows, allAttempts, totalTests, tz, viewerAccess) {
+  var team = [];
+  var warnings = [];
+  var userByEmail = {};
+  var viewer = viewerAccess || {};
+  var viewerRole = String(viewer.role || 'user').toLowerCase();
+  var viewerEmail = String(viewer.email || '').toLowerCase();
+
+  userRows.forEach(function(r) {
+    var em = String(r.email || '').toLowerCase();
+    if (em) userByEmail[em] = r;
+  });
+
+  accessRows.forEach(function(ar) {
+    var em = String(ar.email || '').toLowerCase();
+    if (!em) return;
+    if (viewerEmail && em === viewerEmail) return;
+    if (normalizeUserAccessBoolean_(ar.active, true) === 'false') return;
+    if (normalizeUserAccessBoolean_(ar.showInDashboard, true) === 'false') return;
+    if (viewerRole === 'manager' && String(ar.managerEmail || '').toLowerCase() !== viewerEmail) return;
+    if (viewerRole !== 'admin' && viewerRole !== 'manager') return;
+
+    var userRec = userByEmail[em] || {};
+    var uk = String(userRec.userKey || '');
+    var displayName = ar.displayName || userRec.displayName || em;
+    var userAttempts = uk ? allAttempts.filter(function(a){ return String(a.userKey || '') === uk; }) : [];
+    var summary = null;
+    var warning = '';
+
+    try {
+      summary = buildProgress_(userAttempts, totalTests, tz, 8);
+    } catch (teamErr) {
+      warning = String(teamErr && teamErr.message ? teamErr.message : teamErr);
+      Logger.log('apiGetHome TEAM WARN: ' + em + ': ' + warning);
+      warnings.push({ email: em, message: warning });
+      summary = buildProgress_([], totalTests, tz, 8);
+    }
+
+    var member = {
+      email: em,
+      displayName: displayName,
+      progress: summary
+    };
+    if (warning) member.warning = warning;
+    team.push(member);
+  });
+
+  return { team: team, warnings: warnings };
 }
 
 var AUTH_LOG_SHEET_NAME_ = 'AuthLog';
@@ -145,7 +197,7 @@ function apiGetHome(clientUserKey) {
     var access = requireActiveUser_(userCtx);
     var user = ensureUser_(userCtx.userKey, userCtx.email, userCtx.displayName);
 
-    var startDate = getConfigValue_(config, 'PROGRAM_START_DATE', '2026-04-11');
+    var startDate = getConfigValue_(config, 'PROGRAM_START_DATE', SEKISAN_2026_PROGRAM_START_DATE_);
     var weeks = weeksSinceStart_(startDate, tz);
     var plans = getTestPlanRows_();
 
@@ -224,28 +276,19 @@ function apiGetHome(clientUserKey) {
     var progress = buildProgress_(attempts, plans.length, tz, 8);
 
     var team = [];
+    var teamWarnings = [];
     if (access.role === 'manager' || access.role === 'admin') {
-      // admin/manager: build team from UserAccess (all intended members) joined with Users (for userKey/displayName)
-      var selfEmail = String(userCtx.email || '').toLowerCase();
-      var accessRows = readRecords_(getSheet_(SHEETS.UserAccess));
-      var userRows2 = readRecords_(getSheet_(SHEETS.Users));
-      var userByEmail = {};
-      userRows2.forEach(function(r) {
-        var em = String(r.email || '').toLowerCase();
-        if (em) userByEmail[em] = r;
-      });
-      accessRows.forEach(function(ar) {
-        var em = String(ar.email || '').toLowerCase();
-        if (!em) return;
-        if (em === selfEmail) return; // exclude self
-        if (String(ar.active || '').toLowerCase() === 'false') return; // skip inactive
-        var userRec = userByEmail[em] || {};
-        var uk = String(userRec.userKey || '');
-        var displayName = userRec.displayName || em;
-        var userAttempts = uk ? allAttempts.filter(function(a){ return String(a.userKey || '') === uk; }) : [];
-        var summary = buildProgress_(userAttempts, plans.length, tz, 8);
-        team.push({ email: em, displayName: displayName, progress: summary });
-      });
+      try {
+        var accessRows = readRecords_(getUserAccessSheet_());
+        var userRows2 = readRecords_(getSheet_(SHEETS.Users));
+        var teamResult = buildTeamProgressSummary_(accessRows, userRows2, allAttempts, plans.length, tz, access);
+        team = teamResult.team;
+        teamWarnings = teamResult.warnings;
+      } catch (teamErrOuter) {
+        var teamMsg = String(teamErrOuter && teamErrOuter.message ? teamErrOuter.message : teamErrOuter);
+        Logger.log('apiGetHome TEAM OUTER WARN: ' + teamMsg);
+        teamWarnings.push({ email: '', message: teamMsg });
+      }
     }
 
     // Use optimized functions with pre-read data
@@ -253,6 +296,7 @@ function apiGetHome(clientUserKey) {
     var nextAction = computeNextAction_(unlocked, submittedMap, weakTags, next);
     var fieldStats = [];  // PERF: loaded lazily via apiGetFieldStats
     var scoreHistory = getRecentScoresFromRows_(attempts, 10);
+    var mockYears = getSekisanAvailableMockYears_();
 
     return toSerializable_({
       config: config,
@@ -266,7 +310,9 @@ function apiGetHome(clientUserKey) {
       scoreHistory: scoreHistory,
       auth: access,
       team: team,
-      fieldStats: fieldStats
+      teamWarnings: teamWarnings,
+      fieldStats: fieldStats,
+      mockYears: mockYears
     });
   } catch (e) {
     var msg = String((e && e.message) ? e.message : (e || ''));
@@ -316,7 +362,7 @@ function apiStartTest(testIndex, forceNew, clientUserKey) {
   try {
     var config = getConfigMap_();
     var tz = getConfigValue_(config, 'TIMEZONE', 'Asia/Tokyo');
-    var weeks = weeksSinceStart_(getConfigValue_(config, 'PROGRAM_START_DATE', '2026-04-11'), tz);
+    var weeks = weeksSinceStart_(getConfigValue_(config, 'PROGRAM_START_DATE', SEKISAN_2026_PROGRAM_START_DATE_), tz);
     var plan = getTestPlanByIndex_(testIndex);
     if (!plan) return { _error: true, message: 'テストプラン(testIndex=' + testIndex + ')が見つかりません' };
 
@@ -437,12 +483,25 @@ function apiStartTrainingTest(clientUserKey) {
 
 function apiStartMockExam(year, part, resume, clientUserKey) {
   __clientUserKey = clientUserKey || '';
-  var validYears = SEKISAN_YEARS_;
   var validParts = SEKISAN_MOCK_PARTS_;
   year = String(year || '').toUpperCase();
   part = String(part || 'FULL').toUpperCase();
-  if (validYears.indexOf(year) < 0 || validParts.indexOf(part) < 0) {
+  var availableYears = getSekisanAvailableMockYears_();
+  var yearInfo = null;
+  for (var y = 0; y < availableYears.length; y++) {
+    if (availableYears[y].code === year) {
+      yearInfo = availableYears[y];
+      break;
+    }
+  }
+  if (!yearInfo || validParts.indexOf(part) < 0) {
     throw new Error('年度またはパートが無効です');
+  }
+  if (part === 'I' && Number(yearInfo.partIQuestions || 0) === 0) {
+    throw new Error(formatSekisanYear_(year) + ' Ⅰ建築一般の問題がまだ登録されていません');
+  }
+  if (part === 'II' && Number(yearInfo.partIIQuestions || 0) === 0) {
+    throw new Error(formatSekisanYear_(year) + ' Ⅱ数量積算の問題がまだ登録されていません');
   }
 
   var config = getConfigMap_();
@@ -491,7 +550,8 @@ function apiStartMockExam(year, part, resume, clientUserKey) {
     throw new Error(formatSekisanYear_(year) + ' ' + sekisanMockPartLabel_(part) + 'の問題がまだ登録されていません');
   }
 
-  var timeLimitMinutes = Number(getConfigValue_(config, 'MOCK_TIME_LIMIT_MINUTES', 120));
+  var timeLimitMinutes = Number(getConfigValue_(config, 'MOCK_TIME_LIMIT_MINUTES', 180));
+  if (!timeLimitMinutes || timeLimitMinutes === 120) timeLimitMinutes = 180;
   var now = getNow_();
   var endsAtDate = new Date(now.getTime() + timeLimitMinutes * 60000);
   var startedAt = formatDateTime_(now, tz);
@@ -631,6 +691,7 @@ function apiSubmitTest(payload) {
       answerRows.push({
         attemptId: attemptId,
         qId: q.qId,
+        segmentId: q.segmentId,
         chosen: chosen,
         isCorrect: isCorrect,
         answeredAt: formatDateTime_(now, tz),
@@ -759,9 +820,18 @@ function apiStartFieldTest(tag1, requestedLimit, clientUserKey) {
 
   // Read QuestionBank once and reuse
   var allQb = readQuestionBank_();
+  var target = String(tag1 || '').trim();
+  var targetFieldDef = getSekisanFieldDefinitionByTag_(target);
+  var targetSegmentId = getSekisanFieldSegmentId_(target);
   var qb = allQb.filter(function(q) {
-    return q.status === 'published' && isValidChoiceQuestion_(q)
-      && String(q.tag1) === String(tag1);
+    var matchesField = targetFieldDef
+      ? getSekisanFieldKeyForQuestion_(q) === targetFieldDef.tag
+      : targetSegmentId
+      ? String(q.segmentId || '').trim() === targetSegmentId
+      : (String(q.tag1 || '').trim() === target
+          || String(q.tag2 || '').trim() === target
+          || String(q.tag3 || '').trim() === target);
+    return q.status === 'published' && isValidChoiceQuestion_(q) && matchesField;
   });
 
   if (qb.length === 0) {
@@ -1087,7 +1157,7 @@ function apiAdminListUserAccess(clientUserKey) {
   __clientUserKey = clientUserKey || '';
   var userCtx = getUserContext_();
   requireAdmin_(userCtx);
-  return readRecords_(getUserAccessSheet_());
+  return toSerializable_(readRecords_(getUserAccessSheet_()));
 }
 
 function apiAdminUpsertUserAccess(payload, clientUserKey) {
@@ -1106,10 +1176,20 @@ function apiAdminUpsertUserAccess(payload, clientUserKey) {
       active: (item.active === false || String(item.active).toLowerCase() === 'false') ? 'false' : 'true',
       updatedAt: formatDateTime_(getNow_(), tz)
     };
+    if (item.hasOwnProperty('displayName')) {
+      row.displayName = String(item.displayName || '').trim();
+    }
+    if (item.hasOwnProperty('showInDashboard')) {
+      row.showInDashboard = normalizeUserAccessBoolean_(item.showInDashboard, true);
+    }
     upsertByKey_(SHEETS.UserAccess, 'email', row);
     updated += 1;
   });
   return { status: 'ok', updated: updated };
+}
+
+function normalizeUserAccessImportHeader_(value) {
+  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 function apiAdminImportUserAccessCsv_(csvText, clientUserKey) {
@@ -1121,17 +1201,31 @@ function apiAdminImportUserAccessCsv_(csvText, clientUserKey) {
   if (!rows || rows.length === 0) return { status: 'ok', updated: 0 };
 
   var startIdx = 0;
+  var headerMap = null;
   var header = rows[0].map(function(v){ return String(v || '').trim().toLowerCase(); });
-  if (header[0] === 'email') startIdx = 1;
+  if (header[0] === 'email') {
+    startIdx = 1;
+    headerMap = {};
+    header.forEach(function(name, idx) {
+      headerMap[normalizeUserAccessImportHeader_(name)] = idx;
+    });
+  }
+
+  function getCsvValue_(row, normalizedName, fallbackIndex) {
+    if (headerMap && headerMap.hasOwnProperty(normalizedName)) {
+      return row[headerMap[normalizedName]];
+    }
+    return fallbackIndex < row.length ? row[fallbackIndex] : '';
+  }
 
   var updated = 0;
   for (var i = startIdx; i < rows.length; i++) {
     var r = rows[i] || [];
-    var email = String(r[0] || '').trim();
+    var email = String(getCsvValue_(r, 'email', 0) || '').trim();
     if (!email) continue;
-    var role = String(r[1] || 'user').trim().toLowerCase();
-    var managerEmail = String(r[2] || '').trim();
-    var activeRaw = String(r[3] || 'true').trim().toLowerCase();
+    var role = String(getCsvValue_(r, 'role', 1) || 'user').trim().toLowerCase();
+    var managerEmail = String(getCsvValue_(r, 'manageremail', 2) || '').trim();
+    var activeRaw = String(getCsvValue_(r, 'active', 3) || 'true').trim().toLowerCase();
     var active = (activeRaw === 'false' || activeRaw === '0' || activeRaw === 'no') ? 'false' : 'true';
     var row = {
       email: email,
@@ -1140,6 +1234,12 @@ function apiAdminImportUserAccessCsv_(csvText, clientUserKey) {
       active: active,
       updatedAt: formatDateTime_(getNow_(), tz)
     };
+    if ((headerMap && headerMap.hasOwnProperty('showindashboard')) || (!headerMap && r.length > 4)) {
+      row.showInDashboard = normalizeUserAccessBoolean_(getCsvValue_(r, 'showindashboard', 4), true);
+    }
+    if ((headerMap && headerMap.hasOwnProperty('displayname')) || (!headerMap && r.length > 5)) {
+      row.displayName = String(getCsvValue_(r, 'displayname', 5) || '').trim();
+    }
     upsertByKey_(SHEETS.UserAccess, 'email', row);
     updated += 1;
   }
