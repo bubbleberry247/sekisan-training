@@ -4515,10 +4515,30 @@
         setHtml('test-timer', '');
         return;
       }
-      const endsAt = new Date(String(endsAtStr).replace(' ', 'T'));
+      const parseTimerDate = function(value) {
+        if (!value) return null;
+        var direct = new Date(value);
+        if (!isNaN(direct.getTime())) return direct;
+        var normalized = new Date(String(value).replace(' ', 'T'));
+        return isNaN(normalized.getTime()) ? null : normalized;
+      };
+      const endsAt = parseTimerDate(endsAtStr);
+      const serverNow = parseTimerDate(serverNowStr);
+      if (!endsAt) {
+        console.warn('[timer] invalid endsAt:', endsAtStr);
+        setHtml('test-timer', '');
+        return;
+      }
+      const clientStartedAt = Date.now();
+      const serverStartedAt = serverNow ? serverNow.getTime() : clientStartedAt;
       const tick = function(){
-        const now = new Date();
-        const remain = endsAt.getTime() - now.getTime();
+        const estimatedServerNow = serverStartedAt + (Date.now() - clientStartedAt);
+        const remain = endsAt.getTime() - estimatedServerNow;
+        if (!isFinite(remain)) {
+          setHtml('test-timer', '');
+          stopTimer();
+          return;
+        }
         if (remain <= 0) {
           setHtml('test-timer', '<span class="danger">制限時間を過ぎました</span>');
           stopTimer();
