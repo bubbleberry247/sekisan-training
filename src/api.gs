@@ -253,8 +253,7 @@ function apiGetHome(clientUserKey) {
     var startedMap = {};
     attempts.forEach(function(a){
       if (a.status === 'started' && a.mode === 'test') {
-        var endsAt = a.endsAt ? new Date(a.endsAt) : null;
-        if (!endsAt || now <= endsAt) {
+        if (!isAttemptExpired_(a, now, tz)) {
           startedMap[String(a.testIndex)] = true;
         }
       }
@@ -376,15 +375,15 @@ function apiStartTest(testIndex, forceNew, clientUserKey) {
       if (forceNew) {
         updateAttempt_(existing.index, { status: 'abandoned' });
       } else {
-        var endsAt = existing.row.endsAt ? new Date(existing.row.endsAt) : null;
-        if (!endsAt || getNow_() <= endsAt) {
+        var endsAt = parseDateTime_(existing.row.endsAt, tz);
+        if (endsAt && getNow_() <= endsAt) {
           var qIds = getTestSet_(testIndex, plan, config);
           var questions = getQuestionsByIds_(qIds).map(toQuestionForClient_);
           if (questions.length > 0) {
             return {
               attemptId: String(existing.row.attemptId),
               testIndex: testIndex,
-              endsAt: String(existing.row.endsAt || ''),
+              endsAt: formatDateTime_(endsAt, tz),
               serverNow: formatDateTime_(getNow_(), tz),
               questions: questions
             };
@@ -514,8 +513,8 @@ function apiStartMockExam(year, part, resume, clientUserKey) {
   if (existing) {
     if (resume) {
       // Resume existing mock attempt
-      var endsAt = existing.row.endsAt ? new Date(existing.row.endsAt) : null;
-      if (endsAt && getNow_() > endsAt) {
+      var endsAt = parseDateTime_(existing.row.endsAt, tz);
+      if (!endsAt || getNow_() > endsAt) {
         // Expired ? abandon and fall through to create new
         updateAttempt_(existing.index, { status: 'expired' });
       } else {
@@ -529,7 +528,7 @@ function apiStartMockExam(year, part, resume, clientUserKey) {
         var questions = getQuestionsByIds_(qIds).map(toQuestionForClient_lite_);
         var rules = getExamSectionRules_(year, part);
         // endsAt を文字列に正規化（Date オブジェクトのまま返すと google.script.run で null になる）
-        var resumeEndsAt = endsAt ? formatDateTime_(endsAt, tz) : String(existing.row.endsAt || '');
+        var resumeEndsAt = formatDateTime_(endsAt, tz);
         return {
           attemptId: existing.row.attemptId,
           year: year,
@@ -586,8 +585,10 @@ function apiCheckActiveMockAttempt(year, part, clientUserKey) {
   requireActiveUser_(userCtx);
   var existing = findActiveMockAttempt_(userCtx.userKey, year, part);
   if (existing) {
-    var endsAt = existing.row.endsAt ? new Date(existing.row.endsAt) : null;
-    if (!endsAt || getNow_() <= endsAt) {
+    var config = getConfigMap_();
+    var tz = getConfigValue_(config, 'TIMEZONE', 'Asia/Tokyo');
+    var endsAt = parseDateTime_(existing.row.endsAt, tz);
+    if (endsAt && getNow_() <= endsAt) {
       return { hasActive: true, attemptId: existing.row.attemptId, startedAt: String(existing.row.startedAt || '') };
     }
   }
@@ -638,12 +639,10 @@ function apiSubmitTest(payload) {
     var attempt = attemptInfo.row;
     if (attempt.status !== 'started') throw new Error('この試験は開始済みではありません');
 
-    var now = getNow_();
-    var endsAt = attempt.endsAt ? new Date(attempt.endsAt) : null;
-    var expired = endsAt && now > endsAt;
-
     var config = getConfigMap_();
     var tz = getConfigValue_(config, 'TIMEZONE', 'Asia/Tokyo');
+    var now = getNow_();
+    var expired = isAttemptExpired_(attempt, now, tz);
 
     if (expired) {
       updateAttempt_(attemptInfo.index, { status: 'expired', submittedAt: formatDateTime_(now, tz), scoreTotal: 0, scoreAbility: 0 });
@@ -676,14 +675,11 @@ function apiSubmitTest(payload) {
     answers.forEach(function(a){
       var q = qMap[a.qId];
       if (!q) return;
-      var correct = String(q.correct || '').split(',').map(function(s){ return s.trim().toUpperCase(); }).filter(Boolean);
       var chosenRaw = a.chosen;
       var chosenList = Array.isArray(chosenRaw) ? chosenRaw : String(chosenRaw || '').split(',');
       chosenList = chosenList.map(function(s){ return String(s || '').trim().toUpperCase(); }).filter(Boolean);
       var chosen = chosenList.join(',');
-      var correctMap = {};
-      correct.forEach(function(k){ correctMap[k] = true; });
-      var isCorrect = (chosenList.length === correct.length) && chosenList.every(function(k){ return correctMap[k]; });
+      var isCorrect = isCorrectAnswer_(q, chosenList);
       if (isCorrect) scoreTotal += 1;
       if (q.type === 'ability' && isCorrect) scoreAbility += 1;
       answersMap[q.qId] = { chosenList: chosenList, isCorrect: isCorrect };
@@ -706,22 +702,7 @@ function apiSubmitTest(payload) {
           var k = keyMap[chosenList[0]] || '';
           explainChoice = k ? (q[k] || '') : '';
         }
-        var qClient = toQuestionForClient_(q);
-        wrongList.push({
-          qId: qClient.qId,
-          stem: qClient.stem,
-          chosen: chosen,
-          correct: qClient.correct,
-          explainShort: qClient.explainShort,
-          explainLong: qClient.explainLong,
-          explainChoice: explainChoice,
-          choices: qClient.choices,
-          explainA: qClient.explainA,
-          explainB: qClient.explainB,
-          explainC: qClient.explainC,
-          explainD: qClient.explainD,
-          explainE: qClient.explainE
-        });
+        wrongList.push(buildWrongQuestionForClient_(q, chosen, explainChoice));
       }
     });
 

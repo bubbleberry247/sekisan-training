@@ -16,6 +16,37 @@ function formatDateTime_(d, tz) {
   return Utilities.formatDate(d, tz, 'yyyy-MM-dd HH:mm:ss');
 }
 
+function parseDateTime_(value, tz) {
+  if (value instanceof Date) {
+    return isNaN(value.getTime()) ? null : value;
+  }
+  var raw = String(value || '').trim();
+  if (!raw) return null;
+
+  var parsed = null;
+  var normalized = raw.replace('T', ' ');
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(normalized)) {
+    try {
+      parsed = Utilities.parseDate(normalized, tz || 'Asia/Tokyo', 'yyyy-MM-dd HH:mm:ss');
+    } catch (e) {
+      parsed = null;
+    }
+  }
+  if (!parsed) parsed = new Date(raw);
+  return parsed && !isNaN(parsed.getTime()) ? parsed : null;
+}
+
+function isTimedAttemptMode_(mode) {
+  return ['test', 'mock', 'mini', 'training', 'field'].indexOf(String(mode || '')) !== -1;
+}
+
+function isAttemptExpired_(attempt, now, tz) {
+  var rawEndsAt = attempt ? attempt.endsAt : '';
+  var endsAt = parseDateTime_(rawEndsAt, tz);
+  if (isTimedAttemptMode_(attempt && attempt.mode)) return !endsAt || now > endsAt;
+  return Boolean(rawEndsAt) && (!endsAt || now > endsAt);
+}
+
 function formatDate_(d, tz) {
   return Utilities.formatDate(d, tz, 'yyyy-MM-dd');
 }
@@ -722,6 +753,27 @@ function toQuestionForClient_(q) {
   return toQuestionForClient_full_(q);
 }
 
+function buildWrongQuestionForClient_(q, chosen, explainChoice) {
+  var client = toQuestionForClient_(q);
+  return {
+    qId: client.qId,
+    stem: client.stem,
+    chosen: chosen,
+    correct: client.correct,
+    answerCount: client.answerCount,
+    answerMode: client.answerMode,
+    explainShort: client.explainShort,
+    explainLong: client.explainLong,
+    explainChoice: explainChoice,
+    choices: client.choices,
+    explainA: client.explainA,
+    explainB: client.explainB,
+    explainC: client.explainC,
+    explainD: client.explainD,
+    explainE: client.explainE
+  };
+}
+
 // 全フィールド版（1問取得、復習用）
 function toQuestionForClient_full_(q) {
   var choices = buildChoices_(q);
@@ -745,7 +797,8 @@ function toQuestionForClient_full_(q) {
     tag3: q.tag3 || '',
     source_ref: q.source_ref || '',
     choiceCount: choices.length,
-    answerCount: getAnswerCount_(q)
+    answerCount: getAnswerCount_(q),
+    answerMode: getAnswerMode_(q)
   };
 }
 
@@ -762,7 +815,8 @@ function toQuestionForClient_lite_(q) {
     correct: q.correct || '',
     tag1: q.tag1 || '',
     choiceCount: choices.length,
-    answerCount: getAnswerCount_(q)
+    answerCount: getAnswerCount_(q),
+    answerMode: getAnswerMode_(q)
   };
 }
 
@@ -779,11 +833,40 @@ function buildChoices_(q) {
   return choices;
 }
 
+var SEKISAN_ANY_OF_CORRECT_QIDS_ = {
+  'H26sekisan-040': true,
+  'R2sekisan-013': true
+};
+
+function getCorrectKeys_(q) {
+  return String(q && q.correct || '').split(',').map(function(s) {
+    return String(s || '').trim().toUpperCase();
+  }).filter(Boolean);
+}
+
+function getAnswerMode_(q) {
+  if (q && SEKISAN_ANY_OF_CORRECT_QIDS_[String(q.qId || '')]) return 'anyOf';
+  return getCorrectKeys_(q).length > 1 ? 'allOf' : 'single';
+}
+
 function getAnswerCount_(q) {
-  var raw = String(q.correct || '').trim();
-  if (!raw) return 1;
-  var parts = raw.split(',').map(function(s){ return String(s || '').trim(); }).filter(Boolean);
-  return parts.length > 0 ? parts.length : 1;
+  var keys = getCorrectKeys_(q);
+  if (getAnswerMode_(q) === 'anyOf') return 1;
+  return keys.length > 0 ? keys.length : 1;
+}
+
+function isCorrectAnswer_(q, chosenKeys) {
+  var correctKeys = getCorrectKeys_(q);
+  var chosen = (chosenKeys || []).map(function(s) {
+    return String(s || '').trim().toUpperCase();
+  }).filter(Boolean);
+  if (getAnswerMode_(q) === 'anyOf') {
+    return chosen.length === 1 && correctKeys.indexOf(chosen[0]) >= 0;
+  }
+  if (chosen.length !== correctKeys.length) return false;
+  var correctMap = {};
+  correctKeys.forEach(function(k) { correctMap[k] = true; });
+  return chosen.every(function(k) { return correctMap[k]; });
 }
 
 function parseExamQId_(qId) {

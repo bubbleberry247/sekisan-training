@@ -3407,10 +3407,11 @@
       }
       const chosenKeys = Array.isArray(state.answers[q.qId]) ? state.answers[q.qId] : (state.answers[q.qId] ? [state.answers[q.qId]] : []);
       const correctKeys = getCorrectKeys(q);
-      const isCorrect = isCorrectSelection(correctKeys, chosenKeys);
+      const isCorrect = isCorrectSelection(q, chosenKeys);
       const correctNums = keysToNumbers(q, correctKeys);
       const chosenNum = keysToNumbers(q, chosenKeys);
-      const correctCount = correctKeys.length;
+      const answerMode = getAnswerMode(q);
+      const correctCount = getAnswerCount(q);
       const chosenCount = chosenKeys.length;
       const badgeClass = isCorrect ? 'ok' : 'ng';
       const badge = isCorrect ? '○' : '×';
@@ -3447,7 +3448,8 @@
       }).join('');
 
       const verdict = isCorrect ? '正解です！' : '不正解です。';
-      const correctText = correctNums ? ('正解は ' + escapeHtml(correctNums) + ' です' + (correctCount > 1 ? '（' + correctCount + 'つ選択）' : '') + '。') : '正解情報がありません。';
+      const correctDisplay = answerMode === 'anyOf' ? correctNums.split(',').join(' または ') : correctNums;
+      const correctText = correctNums ? ('正解は ' + escapeHtml(correctDisplay) + (answerMode === 'anyOf' ? ' のいずれかです。' : (' です' + (correctCount > 1 ? '（' + correctCount + 'つ選択）' : '') + '。'))) : '正解情報がありません。';
       const chosenText = chosenNum ? ('あなたの解答: ' + escapeHtml(chosenNum) + (correctCount > 1 ? '（' + chosenCount + 'つ選択）' : '')) : 'あなたの解答: 未選択';
       const header = '<div class="result-badge ' + badgeClass + '">' + badge + '</div>' +
         '<div><div class="result-verdict ' + badgeClass + '">' + verdict + '</div>' +
@@ -3798,6 +3800,11 @@
       return String(q.correct || '').split(',').map(function(s){ return s.trim().toUpperCase(); }).filter(Boolean);
     }
 
+    function getAnswerMode(q) {
+      if (q && q.answerMode) return String(q.answerMode);
+      return getCorrectKeys(q).length > 1 ? 'allOf' : 'single';
+    }
+
     function getAnswerCount(q) {
       if (q && q.answerCount !== undefined && q.answerCount !== null) {
         var n = Number(q.answerCount);
@@ -3867,11 +3874,14 @@
     }
 
     function isMultiQuestion(q) {
-      var keys = getCorrectKeys(q);
-      return keys.length > 1;
+      return getAnswerCount(q) > 1;
     }
 
-    function isCorrectSelection(correctKeys, chosenKeys) {
+    function isCorrectSelection(q, chosenKeys) {
+      var correctKeys = getCorrectKeys(q);
+      if (getAnswerMode(q) === 'anyOf') {
+        return chosenKeys.length === 1 && correctKeys.indexOf(chosenKeys[0]) >= 0;
+      }
       if (correctKeys.length !== chosenKeys.length) return false;
       var map = {};
       correctKeys.forEach(function(k){ map[k] = true; });
@@ -4187,13 +4197,13 @@
         const correctKeys = getCorrectKeys(w);
         const correctNums = keysToNumbers(w, correctKeys);
         const chosenNums = keysToNumbers(w, chosenKeys);
-        const correctCount = correctKeys.length;
+        const answerMode = getAnswerMode(w);
+        const correctCount = getAnswerCount(w);
         const chosenCount = chosenKeys.length;
         const explainMain = w.explainLong || w.explainShort || '';
         const explainMainHtml = explainMain ? '<div class="small">' + escapeHtml(explainMain) + '</div>' : '';
         if (!w.choices || w.choices.length === 0) {
-          const isMulti = String(w.correct || '').indexOf(',') >= 0;
-          const multiLabel = isMulti ? '（複数選択）' : '';
+          const multiLabel = answerMode === 'anyOf' ? '（いずれか1つ）' : (correctCount > 1 ? '（複数選択）' : '');
           const explain = w.explainChoice ? ('<div class="small">不正解解説: ' + escapeHtml(w.explainChoice) + '</div>') : '';
           return '<div class="card"><div><b>' + escapeHtml(w.qId) + '</b> ' + fmtStem(w.stem) + '</div>' +
             '<div class="small">あなたの回答: ' + escapeHtml(w.chosen) + ' / 正解: ' + escapeHtml(w.correct) + multiLabel + '</div>' +
@@ -4227,7 +4237,8 @@
             (explain ? '<div class="small">' + escapeHtml(explain) + '</div>' : '') +
             '</div>';
         }).join('');
-        const correctText = correctNums ? ('正解は ' + escapeHtml(correctNums) + ' です' + (correctCount > 1 ? '（' + correctCount + 'つ選択）' : '') + '。') : '正解情報がありません。';
+        const correctDisplay = answerMode === 'anyOf' ? correctNums.split(',').join(' または ') : correctNums;
+        const correctText = correctNums ? ('正解は ' + escapeHtml(correctDisplay) + (answerMode === 'anyOf' ? ' のいずれかです。' : (' です' + (correctCount > 1 ? '（' + correctCount + 'つ選択）' : '') + '。'))) : '正解情報がありません。';
         const chosenText = chosenNums ? ('あなたの解答: ' + escapeHtml(chosenNums) + (correctCount > 1 ? '（' + chosenCount + 'つ選択）' : '')) : 'あなたの解答: 未選択';
         const header = '<div class="result-label">解答結果</div>' +
           '<div class="result-badge ng">×</div>' +
@@ -4278,9 +4289,7 @@
         var chosenStr = Array.isArray(chosen) ? chosen.join(',') : String(chosen || '');
         var correctKeys = String(q.correct || '').split(',').map(function(s) { return s.trim().toUpperCase(); }).filter(Boolean);
         var chosenKeys = chosenStr.split(',').map(function(s) { return s.trim().toUpperCase(); }).filter(Boolean);
-        var correctMap = {};
-        correctKeys.forEach(function(k) { correctMap[k] = true; });
-        var isCorrect = answered && (chosenKeys.length === correctKeys.length) && chosenKeys.every(function(k) { return correctMap[k]; });
+        var isCorrect = answered && isCorrectSelection(q, chosenKeys);
         var icon = !answered ? '<span style="color:#9ca3af">-</span>' : (isCorrect ? '<span style="color:#4a7c59">○</span>' : '<span style="color:#c62828">×</span>');
         var bgColor = !answered ? '' : (isCorrect ? '' : 'background:#fff3f0;');
         var stem = String(q.stem || '').substring(0, 40);
@@ -4295,9 +4304,7 @@
         var chosenStr = Array.isArray(chosen) ? chosen.join(',') : String(chosen || '');
         var correctKeys = String(q.correct || '').split(',').map(function(s) { return s.trim().toUpperCase(); }).filter(Boolean);
         var chosenKeys = chosenStr.split(',').map(function(s) { return s.trim().toUpperCase(); }).filter(Boolean);
-        var correctMap = {};
-        correctKeys.forEach(function(k) { correctMap[k] = true; });
-        if ((chosenKeys.length === correctKeys.length) && chosenKeys.every(function(k) { return correctMap[k]; })) correctCount++;
+        if (isCorrectSelection(q, chosenKeys)) correctCount++;
       });
       return '<div style="margin-top:16px"><div style="font-weight:600;margin-bottom:8px">正誤表 (' + correctCount + '/' + answeredCount + '問正解)</div>' +
         '<div class="table-wrap"><table style="width:100%"><thead><tr><th style="width:40px">No</th><th style="width:40px">結果</th><th>問題</th></tr></thead><tbody>' +
@@ -4323,9 +4330,7 @@
           var chosenStr = Array.isArray(chosen) ? chosen.join(',') : String(chosen || '');
           var correctKeys = String(q.correct || '').split(',').map(function(s) { return s.trim().toUpperCase(); }).filter(Boolean);
           var chosenKeys = chosenStr.split(',').map(function(s) { return s.trim().toUpperCase(); }).filter(Boolean);
-          var correctMap = {};
-          correctKeys.forEach(function(k) { correctMap[k] = true; });
-          isCorrect = (chosenKeys.length === correctKeys.length) && chosenKeys.every(function(k) { return correctMap[k]; });
+          isCorrect = isCorrectSelection(q, chosenKeys);
         }
 
         var bgColor = !answered ? '#F7F2ED' : (isCorrect ? '#e8f5e9' : '#fff3f0');

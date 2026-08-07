@@ -917,16 +917,22 @@ function diagFixQuestionBank_(doFix) {
 
   var issues = [];
   var fixed = 0;
+  var alternativeAnswers = [];
 
   for (var i = 1; i < data.length; i++) {
     if (String(data[i][statusCol]) !== 'published') continue;
     var qId = String(data[i][qIdCol] || '');
     var stem = String(data[i][stemCol] || '');
     var correct = String(data[i][correctCol] || '');
-    var answerCount = correct.split(',').map(function(s){ return s.trim(); }).filter(Boolean).length;
+    var answerPolicy = { qId: qId, correct: correct };
+    var answerMode = getAnswerMode_(answerPolicy);
+    var answerCount = getAnswerCount_(answerPolicy);
+    if (answerMode === 'anyOf') {
+      alternativeAnswers.push({ row: i + 1, qId: qId, acceptedAnswers: getCorrectKeys_(answerPolicy) });
+    }
 
     // Check 1: multi-answer but stem says "1つ選べ" or "１つ選べ"
-    if (answerCount > 1 && (stem.indexOf('1つ選べ') >= 0 || stem.indexOf('１つ選べ') >= 0)) {
+    if (answerMode === 'allOf' && answerCount > 1 && (stem.indexOf('1つ選べ') >= 0 || stem.indexOf('１つ選べ') >= 0)) {
       issues.push({ row: i + 1, qId: qId, type: 'STEM_1つ選べ', answerCount: answerCount, correct: correct, stemSnippet: stem.substring(0, 80) });
       if (doFix) {
         var newStem = stem.replace(/1つ選べ/g, '2つ選べ').replace(/１つ選べ/g, '２つ選べ');
@@ -936,7 +942,7 @@ function diagFixQuestionBank_(doFix) {
     }
 
     // Check 2: multi-answer but stem has no "2つ" anywhere (e.g. "最も不適当なものはどれか" without count)
-    if (answerCount > 1 && stem.indexOf('2つ') < 0 && stem.indexOf('２つ') < 0 && stem.indexOf('1つ選べ') < 0 && stem.indexOf('１つ選べ') < 0) {
+    if (answerMode === 'allOf' && answerCount > 1 && stem.indexOf('2つ') < 0 && stem.indexOf('２つ') < 0 && stem.indexOf('1つ選べ') < 0 && stem.indexOf('１つ選べ') < 0) {
       issues.push({ row: i + 1, qId: qId, type: 'STEM_NO_COUNT', answerCount: answerCount, correct: correct, stemSnippet: stem.substring(0, 80) });
       // For STEM_NO_COUNT: add "不適当なものを2つ選べ" — needs manual review, no auto-fix
     }
@@ -971,7 +977,7 @@ function diagFixQuestionBank_(doFix) {
 
   Logger.log('Issues found: ' + issues.length + ', fixed: ' + fixed);
   issues.forEach(function(iss) { Logger.log(JSON.stringify(iss)); });
-  return { ok: true, issueCount: issues.length, fixedCount: fixed, issues: issues };
+  return { ok: true, issueCount: issues.length, fixedCount: fixed, issues: issues, alternativeAnswers: alternativeAnswers };
 }
 
 // Run from GAS editor: normalize placeholder image paths from qId
