@@ -951,6 +951,10 @@ function buildExamSectionScores_(questions, answersMap) {
   return { sectionScores: sectionScores, penaltyTotal: penaltyTotal };
 }
 
+function isYearOnlyTag_(tag) {
+  return /^(H|R)[0-9]+[A-Z]?(年度)?$/i.test(String(tag || '').trim());
+}
+
 function computeTopWeakTags_(userKey, topN) {
   var tagRows = readRecords_(getSheet_(SHEETS.TagStats)).filter(function(r){ return r.userKey === userKey; });
   return computeTopWeakTagsFromRows_(tagRows, topN);
@@ -961,7 +965,7 @@ function computeTopWeakTagsFromRows_(userTagRows, topN) {
   var WEAK_ERROR_THRESHOLD = 0.30;   // accuracy < 70% = weak
   var MIN_ANSWERED = 5;              // ignore tags with fewer answers
 
-  var rows = userTagRows.slice();
+  var rows = userTagRows.filter(function(r){ return !isYearOnlyTag_(r.tag); });
   rows.forEach(function(r){
     r.answeredCount = Number(r.answeredCount || 0);
     r.correctCount = Number(r.correctCount || 0);
@@ -1177,7 +1181,9 @@ function computeFieldStatsFromRows_(userTagRows, questionBank) {
   });
 
   var tagMap = {};
-  userTagRows.forEach(function(r) { tagMap[r.tag] = r; });
+  userTagRows.forEach(function(r) {
+    if (!isYearOnlyTag_(r.tag)) tagMap[r.tag] = r;
+  });
 
   return FIELD_ORDER.filter(function(f) {
     return Number(fieldCount[f.tag] || 0) > 0;
@@ -1278,7 +1284,7 @@ function updateTagStats_(userKey, answerRows) {
 
     var seen = {};
     tags.forEach(function(tag){
-      if (!tag) return;
+      if (!tag || isYearOnlyTag_(tag)) return;
       if (seen[tag]) return;
       seen[tag] = true;
       var key = userKey + '::' + tag;
