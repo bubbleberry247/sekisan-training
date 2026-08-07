@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 
 
+REPO_DIR = Path(__file__).resolve().parents[1]
 BASE_DIR = Path(r"C:/tmp/kakomon/sekisanshi")
 BASE_CSV = BASE_DIR / "sekisan_all_649.csv"
 H25_R2_CSV = BASE_DIR / "sekisan_H25_R4_merged.csv"
@@ -19,6 +20,8 @@ R3_R4_FIX_JSON = BASE_DIR / "sekisan_r3r4_review_fix.json"
 DEFAULT_VISION_JSONL = BASE_DIR / "sekisan_vision_gpt54.jsonl"
 DEFAULT_OUTPUT_CSV = BASE_DIR / "sekisan_all_final.csv"
 DEFAULT_REPORT_JSON = BASE_DIR / "sekisan_all_final_report.json"
+DEFAULT_CORRECTION_FIXTURE = REPO_DIR / "data" / "sekisan_question_corrections_20260807.json"
+DEFAULT_PRESERVATION_FIXTURE = REPO_DIR / "data" / "sekisan_pipeline_preservation_20260807.json"
 
 HEADERS = [
     "qId", "segmentId", "type", "difficulty",
@@ -33,6 +36,7 @@ HEADERS = [
 YEAR_ORDER = ["H25", "H26", "H27", "H28", "H29", "H30", "R1", "R2", "R3", "R4", "R5", "R6", "R7"]
 REQUIRED_FIELDS = ["stem", "choiceA", "choiceB", "choiceC", "choiceD", "correct", "explainShort"]
 CONTENT_FIELDS = ["stem", "choiceA", "choiceB", "choiceC", "choiceD", "correct", "explainShort"]
+VERIFIED_CORRECTION_FIELDS = ["stem", "choiceA", "choiceB", "choiceC", "choiceD", "correct", "imageUrl"]
 MANUAL_CORRECT = {
     "H26sekisan-040": "B,C",
     "R2sekisan-013": "B,C",
@@ -44,6 +48,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--vision-jsonl", default=str(DEFAULT_VISION_JSONL))
     parser.add_argument("--output-csv", default=str(DEFAULT_OUTPUT_CSV))
     parser.add_argument("--report-json", default=str(DEFAULT_REPORT_JSON))
+    parser.add_argument("--correction-fixture", default=str(DEFAULT_CORRECTION_FIXTURE))
+    parser.add_argument("--preservation-fixture", default=str(DEFAULT_PRESERVATION_FIXTURE))
     return parser.parse_args()
 
 
@@ -58,6 +64,73 @@ def load_review_corrections(path: Path) -> dict[str, dict[str, str]]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     corrections = payload.get("corrections", {})
     return {qid: value for qid, value in corrections.items() if isinstance(value, dict)}
+
+
+def load_verified_corrections(path: Path) -> dict[str, dict[str, str]]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    corrections = payload.get("corrections", {})
+    if not isinstance(corrections, dict) or not corrections:
+        raise ValueError(f"Verified correction fixture has no corrections: {path}")
+    required = set(VERIFIED_CORRECTION_FIELDS)
+    for qid, correction in corrections.items():
+        if not isinstance(correction, dict) or set(correction) != required:
+            raise ValueError(f"Invalid verified correction fields for {qid}")
+    presentation = payload.get("presentationAudit", {})
+    presentation_questions = presentation.get("questions", {})
+    if set(presentation_questions) != set(corrections):
+        raise ValueError("Presentation audit must cover every verified correction qId")
+    for qid, audit in presentation_questions.items():
+        question_mode = audit.get("question") if isinstance(audit, dict) else None
+        choice_mode = audit.get("choices") if isinstance(audit, dict) else None
+        if question_mode not in {"text", "questionImage"} or choice_mode not in {"text", "choiceImage"}:
+            raise ValueError(f"Invalid presentation audit modes for {qid}")
+        has_image = bool(str(corrections[qid].get("imageUrl", "")).strip())
+        if (question_mode == "questionImage") != has_image:
+            raise ValueError(f"Presentation audit and imageUrl disagree for {qid}")
+    for qid, fragments in presentation.get("requiredStemFragments", {}).items():
+        if qid not in corrections or not isinstance(fragments, list) or not fragments:
+            raise ValueError(f"Invalid required stem fragments for {qid}")
+        stem = str(corrections[qid].get("stem", ""))
+        if any(str(fragment) not in stem for fragment in fragments):
+            raise ValueError(f"Verified stem is missing required presentation context for {qid}")
+    return corrections
+
+
+def load_pipeline_preservation_overrides(path: Path) -> dict[str, dict[str, str]]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("purpose") != "pipeline-preservation":
+        raise ValueError(f"Invalid pipeline preservation fixture purpose: {path}")
+    overrides = payload.get("overrides", {})
+    if not isinstance(overrides, dict) or len(overrides) != int(payload.get("overrideCount", -1)):
+        raise ValueError(f"Invalid pipeline preservation override count: {path}")
+    allowed = set(HEADERS) - {"qId", "updatedAt"}
+    for qid, values in overrides.items():
+        if not isinstance(values, dict) or not values or not set(values).issubset(allowed):
+            raise ValueError(f"Invalid pipeline preservation fields for {qid}")
+    return overrides
+
+
+def apply_verified_corrections(
+    row_map: dict[str, dict[str, str]], corrections: dict[str, dict[str, str]]
+) -> None:
+    missing_qids = sorted(set(corrections) - set(row_map))
+    if missing_qids:
+        raise ValueError("Verified correction qIds missing from generated rows: " + ", ".join(missing_qids))
+    for qid, correction in corrections.items():
+        row = row_map[qid]
+        for field in VERIFIED_CORRECTION_FIELDS:
+            row[field] = normalize_text(str(correction[field]))
+
+
+def apply_pipeline_preservation_overrides(
+    row_map: dict[str, dict[str, str]], overrides: dict[str, dict[str, str]]
+) -> None:
+    missing_qids = sorted(set(overrides) - set(row_map))
+    if missing_qids:
+        raise ValueError("Pipeline preservation qIds missing from generated rows: " + ", ".join(missing_qids))
+    for qid, values in overrides.items():
+        for field, value in values.items():
+            row_map[qid][field] = str(value)
 
 
 def load_vision_rows(path: Path) -> dict[str, dict[str, str]]:
@@ -177,6 +250,11 @@ def main() -> None:
     r5_r7_rows = read_csv_rows(R5_R7_CSV)
     review_fixes = load_review_corrections(R3_R4_FIX_JSON)
     vision_rows = load_vision_rows(Path(args.vision_jsonl))
+    verified_corrections = load_verified_corrections(Path(args.correction_fixture))
+    preservation_overrides = load_pipeline_preservation_overrides(Path(args.preservation_fixture))
+    overlap = sorted(set(verified_corrections) & set(preservation_overrides))
+    if overlap:
+        raise ValueError("Verified corrections overlap pipeline preservation overrides: " + ", ".join(overlap))
 
     row_map = build_row_map(base_rows)
 
@@ -203,6 +281,13 @@ def main() -> None:
         for field in CONTENT_FIELDS:
             row[field] = normalize_text(row.get(field, ""))
 
+    # Preserve the already-audited canonical content that legacy OCR/vision
+    # sources would otherwise degrade during regeneration.
+    apply_pipeline_preservation_overrides(row_map, preservation_overrides)
+
+    # Exam-time originals are authoritative and have final precedence.
+    apply_verified_corrections(row_map, verified_corrections)
+
     ordered_qids = sorted(row_map, key=qid_sort_key)
     output_csv = Path(args.output_csv)
     output_csv.parent.mkdir(parents=True, exist_ok=True)
@@ -215,6 +300,10 @@ def main() -> None:
     report = validate(row_map)
     report["vision_rows_used"] = sorted(vision_rows.keys())
     report["review_fix_count"] = len(review_fixes)
+    report["verified_correction_count"] = len(verified_corrections)
+    report["verified_correction_fixture"] = str(Path(args.correction_fixture))
+    report["pipeline_preservation_override_count"] = len(preservation_overrides)
+    report["pipeline_preservation_fixture"] = str(Path(args.preservation_fixture))
     report["output_csv"] = str(output_csv)
 
     report_path = Path(args.report_json)

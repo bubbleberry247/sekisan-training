@@ -1,10 +1,12 @@
 // Code.gs
 
+var SEKISAN_BUILD_VERSION_ = '2026-08-07-questionbank-presentation-audit-v2';
+
 // Warm-up function for time-based trigger (keeps GAS instance warm, avoids cold start)
 function warmUp() {
   getCachedConfig_();
   getCachedTestPlan_();
-  return { ok: true, ts: new Date().toISOString() };
+  return { ok: true, buildVersion: SEKISAN_BUILD_VERSION_, ts: new Date().toISOString() };
 }
 
 function doGet(e) {
@@ -761,6 +763,7 @@ function diagQuestionCoverage_() {
   });
   return {
     ok: true,
+    buildVersion: SEKISAN_BUILD_VERSION_,
     totalQuestions: qb.length,
     statusCounts: statusCounts,
     yearCounts: yearCounts,
@@ -851,35 +854,106 @@ function linkGitHubImages_() {
     return { ok: true, updated: 0, baseUrl: BASE };
   }
 
-  var imgRange = sh.getRange(2, imgCol + 1, data.length - 1, 1);
-  var imgValues = imgRange.getValues();
-  var updated = 0;
-  var cleared = 0;
-  for (var i = 1; i < data.length; i++) {
-    var qId = String(data[i][qIdCol] || '').trim();
-    var prev = String(imgValues[i - 1][0] || '').trim();
-    if (!qId) continue;
-
-    var imageName = sekisanImageBaseNameFromQId_(qId);
-    if (!imageName) continue;
-    if (prev && prev.indexOf('images/sekisan/') !== 0 && prev.indexOf('raw.githubusercontent.com') === -1) continue;
-    var url = BASE + imageName + '.png';
-    if (!imageFileMap[imageName + '.png']) {
-      if (prev) {
-        imgValues[i - 1][0] = '';
-        cleared++;
-      }
-      continue;
-    }
-    if (prev === url) continue;
-    imgValues[i - 1][0] = url;
-    updated++;
+  var plan = buildSekisanGitHubImageLinkPlan_(data, qIdCol, imgCol, imageFileMap, BASE);
+  if (plan.expected !== SEKISAN_EXPECTED_IMAGE_COUNT_) {
+    throw new Error(
+      'QuestionBankの画像行数が想定と一致しないためimageUrl更新を中止しました: ' +
+      plan.expected + '/' + SEKISAN_EXPECTED_IMAGE_COUNT_
+    );
   }
+  if (plan.missing.length > 0) {
+    throw new Error(
+      'GitHub未公開の問題画像があるためimageUrl更新を中止しました: ' +
+      plan.missing.join(', ')
+    );
+  }
+
+  var imgRange = sh.getRange(2, imgCol + 1, data.length - 1, 1);
+  var imgValues = plan.values;
+  var updated = plan.updated;
   if (updated > 0) {
     imgRange.setValues(imgValues);
   }
-  Logger.log('Updated ' + updated + ' imageUrl entries, cleared ' + cleared);
-  return { ok: true, updated: updated, cleared: cleared, availableImages: Object.keys(imageFileMap).length, baseUrl: BASE };
+  Logger.log('Updated ' + updated + ' imageUrl entries');
+  return {
+    ok: true,
+    updated: updated,
+    expectedImages: plan.expected,
+    availableImages: Object.keys(imageFileMap).length,
+    baseUrl: BASE
+  };
+}
+
+// Read-only preflight. Run before linkGitHubImages_ to verify that every
+// QuestionBank image placeholder is already published on GitHub.
+function preflightGitHubImages_() {
+  var BASE = getSekisanGitHubImageBaseUrl_();
+  var imageFileMap = getSekisanGitHubImageFileMap_();
+  var sh = getSheet_(SHEETS.QuestionBank);
+  var data = sh.getDataRange().getValues();
+  if (data.length === 0) return { ok: false, error: 'QuestionBank is empty' };
+
+  var headers = data[0].map(function(header) {
+    return String(header || '').trim().toLowerCase();
+  });
+  var qIdCol = headers.indexOf('qid');
+  var imgCol = headers.indexOf('imageurl');
+  if (qIdCol < 0 || imgCol < 0) {
+    return { ok: false, error: 'QuestionBank headers qId/imageUrl not found' };
+  }
+
+  var plan = buildSekisanGitHubImageLinkPlan_(data, qIdCol, imgCol, imageFileMap, BASE);
+  return {
+    ok: plan.expected === SEKISAN_EXPECTED_IMAGE_COUNT_ && plan.missing.length === 0,
+    expectedImages: plan.expected,
+    requiredImages: SEKISAN_EXPECTED_IMAGE_COUNT_,
+    availableImages: Object.keys(imageFileMap).length,
+    pendingUpdates: plan.updated,
+    missing: plan.missing,
+    baseUrl: BASE
+  };
+}
+
+function buildSekisanGitHubImageLinkPlan_(data, qIdCol, imgCol, imageFileMap, baseUrl) {
+  var values = [];
+  var missing = [];
+  var updated = 0;
+  var expected = 0;
+  for (var i = 1; i < data.length; i++) {
+    var qId = String(data[i][qIdCol] || '').trim();
+    var prev = String(data[i][imgCol] || '').trim();
+    var next = prev;
+    if (!qId) {
+      values.push([next]);
+      continue;
+    }
+
+    var imageName = sekisanImageBaseNameFromQId_(qId);
+    if (!imageName) {
+      values.push([next]);
+      continue;
+    }
+    if (!prev) {
+      values.push([next]);
+      continue;
+    }
+    if (prev.indexOf('images/sekisan/') !== 0 && prev.indexOf('raw.githubusercontent.com') === -1) {
+      values.push([next]);
+      continue;
+    }
+
+    var fileName = imageName + '.png';
+    expected++;
+    if (!imageFileMap[fileName]) {
+      missing.push(qId + ' (' + fileName + ')');
+      values.push([next]);
+      continue;
+    }
+    next = baseUrl + fileName;
+    if (prev !== next) updated++;
+    values.push([next]);
+  }
+  return { values: values, missing: missing, updated: updated, expected: expected };
 }
 
 function getSekisanGitHubImageFileMap_() {

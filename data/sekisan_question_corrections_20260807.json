@@ -1,0 +1,432 @@
+{
+  "schemaVersion": 1,
+  "authority": {
+    "name": "建築積算士学科試験 試験当時原版",
+    "policy": "試験当時原版を正とし、後日差し替えられた公開PDFは正本に用いない",
+    "verifiedAt": "2026-08-07",
+    "sourceSha256": {
+      "sekisan_H25_1ji.pdf": "F45A0DFA0A7F7F0941E1C04EAF3B982E4C5501AD7923A699A817B1C04417419E",
+      "sekisan_H26_1ji.pdf": "5D3E125B9D17CD7D3B310285AAEBA14ECE8A054F711F3156CB702D642694BC30",
+      "sekisan_H27_1ji.pdf": "E224109C35EF698E66FE3706730C5CA3048DDB130AB433C32C2AC7068167BA51",
+      "sekisan_H28_1ji.pdf": "B61F35226D4E6F49F2F52C5B7D5092C0E1CC2802D14D0D1C9A82068BF3F8CBA8",
+      "sekisan_H29_1ji.pdf": "2AD45AC111149D82A6667AE69F540766D68942CA65189568B01E5197216E3997",
+      "sekisan_H30_1ji.pdf": "92978E3A10B830CD6B8C9578C19F4756DDB4119FA8E754B9F1FA8A9F480C8982",
+      "sekisan_R1_1ji.pdf": "E69A527F88D52E14943CD1CE2F989FFC195B5BDD29372A58C2276EDE802E5892",
+      "sekisan_R2_1ji.pdf": "F9F1923B22317BD0156379C8DD208FFC6503A7B64A3B5DE5B5955B4B2F72DDC4",
+      "sekisan_R3_1ji.pdf": "F9FBADFB7EEBC953546DF38B09983A655429F2AA65B9F844873585A899504CBF",
+      "sekisan_R4_1ji.pdf": "0E69CDC6BCFA405A84723C3F0D9F9637FF08414097CB196E2F1C84381EF70E28"
+    }
+  },
+  "presentationAudit": {
+    "policy": "試験当時原版の設問欄を画面表示と照合し、本文・穴埋め位置・図表・選択肢が解答可能な形で揃うことを確認する。図表が設問条件を担う場合はquestionImage、文字だけで意味を保てる場合はtextとする。37問の選択肢はいずれも文字選択肢で意味を保てるためchoiceImageは不要。",
+    "auditedAt": "2026-08-07",
+    "questions": {
+      "H25sekisan-017": {"question": "questionImage", "choices": "text"},
+      "H25sekisan-023": {"question": "text", "choices": "text"},
+      "H25sekisan-029": {"question": "text", "choices": "text"},
+      "H25sekisan-040": {"question": "text", "choices": "text"},
+      "H25sekisan-042": {"question": "text", "choices": "text"},
+      "H25sekisan-043": {"question": "questionImage", "choices": "text"},
+      "H25sekisan-047": {"question": "questionImage", "choices": "text"},
+      "H26sekisan-015": {"question": "text", "choices": "text"},
+      "H26sekisan-036": {"question": "text", "choices": "text"},
+      "H26sekisan-037": {"question": "text", "choices": "text"},
+      "H26sekisan-038": {"question": "text", "choices": "text"},
+      "H26sekisan-039": {"question": "text", "choices": "text"},
+      "H26sekisan-043": {"question": "questionImage", "choices": "text"},
+      "H27sekisan-013": {"question": "text", "choices": "text"},
+      "H27sekisan-036": {"question": "text", "choices": "text"},
+      "H27sekisan-044": {"question": "questionImage", "choices": "text"},
+      "H27sekisan-046": {"question": "questionImage", "choices": "text"},
+      "H27sekisan-049": {"question": "questionImage", "choices": "text"},
+      "H28sekisan-020": {"question": "questionImage", "choices": "text"},
+      "H28sekisan-026": {"question": "text", "choices": "text"},
+      "H28sekisan-044": {"question": "questionImage", "choices": "text"},
+      "H28sekisan-050": {"question": "questionImage", "choices": "text"},
+      "H29sekisan-043": {"question": "questionImage", "choices": "text"},
+      "H29sekisan-049": {"question": "questionImage", "choices": "text"},
+      "H30sekisan-012": {"question": "text", "choices": "text"},
+      "H30sekisan-043": {"question": "questionImage", "choices": "text"},
+      "H30sekisan-049": {"question": "questionImage", "choices": "text"},
+      "R1sekisan-036": {"question": "text", "choices": "text"},
+      "R1sekisan-043": {"question": "questionImage", "choices": "text"},
+      "R1sekisan-045": {"question": "questionImage", "choices": "text"},
+      "R1sekisan-047": {"question": "questionImage", "choices": "text"},
+      "R2sekisan-016": {"question": "questionImage", "choices": "text"},
+      "R2sekisan-045": {"question": "questionImage", "choices": "text"},
+      "R2sekisan-050": {"question": "questionImage", "choices": "text"},
+      "R3sekisan-016": {"question": "questionImage", "choices": "text"},
+      "R3sekisan-043": {"question": "questionImage", "choices": "text"},
+      "R4sekisan-044": {"question": "questionImage", "choices": "text"}
+    },
+    "requiredStemFragments": {
+      "H25sekisan-029": ["指定のない場合の普通土の法幅の係数は", "根切り深さが（A）m未満", "根切り深さが（B）m以上は（D）を標準"],
+      "H27sekisan-013": ["優先順位の高いものから低いものへの順"],
+      "H28sekisan-026": ["製品や［1］の価値", "果たすべき［2］", "かける［3］", "［4］の向上"]
+    },
+    "contextImages": {
+      "H25sekisan-017": {
+        "file": "sekisan_H25_017.png",
+        "sourcePdf": "sekisan_H25_1ji.pdf",
+        "sourcePage": 17,
+        "width": 740,
+        "height": 1110,
+        "sha256": "F87F9CC2F2F22D942707957B91D73D6F25539677F4873ADC2F67D3B8B662F6A2"
+      },
+      "H28sekisan-020": {
+        "file": "sekisan_H28_020.png",
+        "sourcePdf": "sekisan_H28_1ji.pdf",
+        "sourcePage": 20,
+        "width": 830,
+        "height": 640,
+        "sha256": "2103063E9AAE1AA97487AA5E7F4C9C2CAE6DCFF5DC640A0D3BEE093888BC2FE3"
+      }
+    },
+    "restoredContext": {
+      "H25sekisan-017": "改修内訳書の大科目1～9とA/B/Cの位置をquestionImageで復元",
+      "H25sekisan-029": "普通土の法幅係数を定める3行の穴埋め本文をstemに復元",
+      "H27sekisan-013": "優先順位の方向（高い→低い）をstemに復元",
+      "H28sekisan-020": "改修工事費構成の大科目1～9とA/B/Cの位置をquestionImageで復元",
+      "H28sekisan-026": "VE定義の1～4の穴埋め本文をstemに復元"
+    }
+  },
+  "excludedVersionDifferences": {
+    "R4sekisan-043": "試験当時原版は正答肢4。現行公開PDFの正答肢2への差し替えは適用しない。原版画像SHA256=272AD1360A7663B1338CFAF2AA0FF86E69E31D02FBA24CE59FA248F41439D648",
+    "R7sekisan-050": "試験当時原版は芝張り。現行公開PDFのアスファルト舗装への差し替えは適用しない。原版画像SHA256=1C5118FA315F1E8870F8857D4BB6DC12C48AC7C5F7ECD664EDE5073CC5ECC30F"
+  },
+  "corrections": {
+    "H25sekisan-017": {
+      "stem": "改修内訳書標準書式による工事費の構成に関して、（A）、（B）、（C）の部分にあてはまる用語の組合せで、最も適切なものはどれか。",
+      "choiceA": "建具改修 ― 塗装改修 ― 発生材処理",
+      "choiceB": "外部改修 ― ユニット改修 ― 撤去",
+      "choiceC": "外部改修 ― 塗装改修 ― 発生材処理",
+      "choiceD": "建具改修 ― ユニット改修 ― 撤去",
+      "correct": "A",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_H25_017.png"
+    },
+    "H25sekisan-023": {
+      "stem": "環境配慮項目と省エネ化技術項目の次の組合せのうち、最も不適切なものはどれか。",
+      "choiceA": "自然エネルギーの利用 ― 太陽光発電",
+      "choiceB": "長寿命化 ― 構造体の耐久性",
+      "choiceC": "負荷の抑制 ― 外断熱、屋上緑化",
+      "choiceD": "エネルギー・資源の有効利用 ― 階高のゆとり",
+      "correct": "D",
+      "imageUrl": ""
+    },
+    "H25sekisan-029": {
+      "stem": "根切りの法幅に関する次の記述のうち、（A）～（D）中に入る数値の組合せで、最も適切なものはどれか。\n\n指定のない場合の普通土の法幅の係数は、\n・根切り深さが（A）m未満の場合は0とし、法を設けない。\n・根切り深さが（A）m以上（B）m未満は（C）を標準とする。\n・根切り深さが（B）m以上は（D）を標準とする。",
+      "choiceA": "A：1.0 ― B：3.0 ― C：0.3 ― D：0.5",
+      "choiceB": "A：1.5 ― B：5.0 ― C：0.3 ― D：0.6",
+      "choiceC": "A：1.8 ― B：5.0 ― C：0.5 ― D：0.6",
+      "choiceD": "A：2.0 ― B：6.0 ― C：0.6 ― D：1.0",
+      "correct": "B",
+      "imageUrl": ""
+    },
+    "H25sekisan-040": {
+      "stem": "木製建具の計測・計算に関する次の記述のうち、最も不適切なものはどれか。",
+      "choiceA": "主仕上の材質、形状などにより区分し、建具の符号、サイズ別のか所数を数量とする。",
+      "choiceB": "建具金物について計測・計算するときは、その規格、仕様などごとの組数またはか所数を数量とする。",
+      "choiceC": "木製枠は木製建具に含め、金属製枠は金属製建具または金属工事に計上する。",
+      "choiceD": "建具の塗装について計測・計算するときは、塗装・吹付材の定めにより計測・計算する。",
+      "correct": "C",
+      "imageUrl": ""
+    },
+    "H25sekisan-042": {
+      "stem": "塗装材による表面処理の計測・計算に関する次の記述のうち、最も不適切なものはどれか。",
+      "choiceA": "建具の塗装は、適切な統計値によることができる。",
+      "choiceB": "部位、作業工程（塗り回数）、下地などによって区分し、面積で計上する。",
+      "choiceC": "細幅物は、糸幅ごとの延べ長さで計上する。",
+      "choiceD": "折板などの凹凸のある仕上の塗装は、設計寸法による主仕上の見付面積を数量とする。",
+      "correct": "D",
+      "imageUrl": ""
+    },
+    "H25sekisan-043": {
+      "stem": "下図の独立基礎（F1）1か所の埋戻し土量で、次の数量（㎥）のうち、最も適切なものはどれか。なお、土質は特に指定のない普通土である。",
+      "choiceA": "12.04㎥",
+      "choiceB": "17.33㎥",
+      "choiceC": "21.26㎥",
+      "choiceD": "23.35㎥",
+      "correct": "B",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_H25_043.png"
+    },
+    "H25sekisan-047": {
+      "stem": "下図の鉄骨溶接H形鋼梁のL＝7,000、1台の溶接長さ（すみ肉6mm換算）（m）として、最も適切なものはどれか。溶接換算表の換算率を用いて計算しなさい。",
+      "choiceA": "126.00m",
+      "choiceB": "112.00m",
+      "choiceC": "87.50m",
+      "choiceD": "63.00m",
+      "correct": "D",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_H25_047.png"
+    },
+    "H26sekisan-015": {
+      "stem": "内訳書式の特徴に関する次の記述のうち、最も不適切なものはどれか。",
+      "choiceA": "部分別内訳書式は、概算時に使いやすい書式である。",
+      "choiceB": "部分別内訳書式は、資材の購入計画に便利な書式である。",
+      "choiceC": "工種別内訳書式は、工事の施工プロセスに整合した科目順序とした書式である。",
+      "choiceD": "工種別内訳書式は、専門工事会社（職種）別に細目が把握しやすい書式である。",
+      "correct": "B",
+      "imageUrl": ""
+    },
+    "H26sekisan-036": {
+      "stem": "間仕切下地の計測・計算に関する次の記述のうち、最も不適切なものはどれか。",
+      "choiceA": "コンクリートブロックには、補強鉄筋、充填モルタル、開口部補強のまぐさ、がりょうなどを含む。",
+      "choiceB": "軽量鉄骨（LGS）間仕切下地には、振止め、ランナーを含むが、開口部補強金物は含まない。",
+      "choiceC": "ALC板には、材料間の目地処理は含むが、取付金物や開口部補強金物は含まない。",
+      "choiceD": "木造間仕切下地には、土台、柱、間柱、頭つなぎ、まぐさを含む。",
+      "correct": "A",
+      "imageUrl": ""
+    },
+    "H26sekisan-037": {
+      "stem": "内部仕上の区分に関する次の記述のうち、最も不適切なものはどれか。",
+      "choiceA": "開口部周囲の見込、下がり天井の側面は壁に属する。",
+      "choiceB": "床段違いの側面、階段蹴上げは床に属する。",
+      "choiceC": "建具類の枠、額縁、窓台、沓摺は開口部に属する。",
+      "choiceD": "独立梁、回縁は天井に属する。",
+      "correct": "A",
+      "imageUrl": ""
+    },
+    "H26sekisan-038": {
+      "stem": "防水層の計測・計算に関する次の記述のうち、最も不適切なものはどれか。",
+      "choiceA": "原則として躯体または準躯体の設計寸法による面積とする。",
+      "choiceB": "立上りは、防水立上がり寸法と設計寸法にもとづく長さ、またはこれらによる面積とする。",
+      "choiceC": "シート防水などの重ね代は計測の対象としない。",
+      "choiceD": "衛生器具、配管などによる0.5㎡を超える欠除は差し引く。",
+      "correct": "D",
+      "imageUrl": ""
+    },
+    "H26sekisan-039": {
+      "stem": "仕上げの計測・計算に関する次の記述のうち、最も不適切なものはどれか。",
+      "choiceA": "畳敷きは、種別・寸法ごとの枚数を数量とする。",
+      "choiceB": "パラペットの天端、手摺笠木などのモルタル塗りは、厚さごとの面積を数量とする。",
+      "choiceC": "ブラインドは、開口部の内法寸法ごとのか所数を数量とする。",
+      "choiceD": "フリーアクセスフロアは、仕様、高さごとの面積を数量とする。",
+      "correct": "B",
+      "imageUrl": ""
+    },
+    "H26sekisan-043": {
+      "stem": "下図の独立基礎における土工の数量に関する次のうち、最も不適切なものはどれか。なお、土質は普通土であり、根切土は仮置きし埋戻しに使用する。",
+      "choiceA": "根切り ― 41.06㎥",
+      "choiceB": "埋戻し ― 20.44㎥",
+      "choiceC": "建設発生土（不用土） ― 5.48㎥",
+      "choiceD": "床付け ― 4.84㎡",
+      "correct": "A",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_H26_043.png"
+    },
+    "H27sekisan-013": {
+      "stem": "公共建築工事の標準仕様書における、設計図書の優先順位に関する次の㋑～㋭の組合せのうち、優先順位の高いものから低いものへの順として最も適切なものはどれか。",
+      "choiceA": "設計図 ― 質問回答書 ― 現場説明書 ― 特記仕様書 ― 標準仕様書",
+      "choiceB": "設計図 ― 特記仕様書 ― 標準仕様書 ― 現場説明書 ― 質問回答書",
+      "choiceC": "質問回答書 ― 特記仕様書 ― 設計図 ― 標準仕様書 ― 現場説明書",
+      "choiceD": "質問回答書 ― 現場説明書 ― 特記仕様書 ― 設計図 ― 標準仕様書",
+      "correct": "D",
+      "imageUrl": ""
+    },
+    "H27sekisan-036": {
+      "stem": "軽量鉄骨（LGS）壁下地の高さが4.2m、石膏ボード一重張りの時、スタッド幅とスタッド間隔の次の組合せのうち、最も適切なものはどれか。",
+      "choiceA": "90型 ― 450mm",
+      "choiceB": "90型 ― 300mm",
+      "choiceC": "65型 ― 450mm",
+      "choiceD": "65型 ― 300mm",
+      "correct": "B",
+      "imageUrl": ""
+    },
+    "H27sekisan-044": {
+      "stem": "下図の壁（W20）のコンクリートの設計数量（㎥）として、次のうち最も適切なものはどれか。",
+      "choiceA": "3.26㎥",
+      "choiceB": "3.22㎥",
+      "choiceC": "3.16㎥",
+      "choiceD": "3.12㎥",
+      "correct": "A",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_H27_044.png"
+    },
+    "H27sekisan-046": {
+      "stem": "下図㋑～㋥における柱の主筋の継手の数量（か所）として、次のうち最も不適切なものはどれか。なお、㋺の5FLは吹抜けとし、省略部分の継手は含まないものとする。",
+      "choiceA": "㋑ ― 6か所",
+      "choiceB": "㋺ ― 2か所",
+      "choiceC": "㋩ ― 0か所",
+      "choiceD": "㋥ ― 3か所",
+      "correct": "C",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_H27_046.png"
+    },
+    "H27sekisan-049": {
+      "stem": "下図の内壁1面の壁EP塗り数量（㎡）とガラス数量（㎡）の次の組合せのうち、最も適切なものはどれか。",
+      "choiceA": "壁EP塗り23.00㎡ ― ガラス2.80㎡",
+      "choiceB": "壁EP塗り23.00㎡ ― ガラス3.00㎡",
+      "choiceC": "壁EP塗り22.40㎡ ― ガラス2.80㎡",
+      "choiceD": "壁EP塗り22.40㎡ ― ガラス3.00㎡",
+      "correct": "D",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_H27_049.png"
+    },
+    "H28sekisan-020": {
+      "stem": "改修内訳書標準書式による工事費の構成に関して、（A）～（C）に当てはまる次の組合せのうち、最も適切なものはどれか。",
+      "choiceA": "躯体改修 ― 外壁撤去 ― 解体撤去",
+      "choiceB": "直接仮設 ― 外壁改修 ― 解体撤去",
+      "choiceC": "直接仮設 ― 外壁改修 ― 発生材処理",
+      "choiceD": "躯体改修 ― 外壁撤去 ― 発生材処理",
+      "correct": "C",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_H28_020.png"
+    },
+    "H28sekisan-026": {
+      "stem": "バリューエンジニアリング（VE）の定義に関する記述の1～4に当てはまる用語として、次のうち最も不適切なものはどれか。\n\n製品や［1］の価値を、それが果たすべき［2］と、そのためにかける［3］との関係で把握し、システム化された手順によって［4］の向上を図る手法である。",
+      "choiceA": "サービス",
+      "choiceB": "情報",
+      "choiceC": "コスト",
+      "choiceD": "価値",
+      "correct": "B",
+      "imageUrl": ""
+    },
+    "H28sekisan-044": {
+      "stem": "鉄骨鉄筋コンクリート造のビルの積算で、下記の集計結果が得られた。これをもとに「価格に対応する」コンクリートの数量（㎥）として次のうち、最も適切なものはどれか。",
+      "choiceA": "5,771㎥",
+      "choiceB": "5,793㎥",
+      "choiceC": "5,861㎥",
+      "choiceD": "5,967㎥",
+      "correct": "B",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_H28_044.png"
+    },
+    "H28sekisan-050": {
+      "stem": "下図の内部改修工事において、展開図A面の壁の既存仕上（クロス）の撤去面積と、改修後の壁仕上（クロス）面積の次の組合せのうち、最も適切なものはどれか。",
+      "choiceA": "既存35.04㎡ ― 改修後28.94㎡",
+      "choiceB": "既存35.04㎡ ― 改修後29.44㎡",
+      "choiceC": "既存35.64㎡ ― 改修後28.94㎡",
+      "choiceD": "既存35.64㎡ ― 改修後29.44㎡",
+      "correct": "B",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_H28_050.png"
+    },
+    "H29sekisan-043": {
+      "stem": "下図の基礎梁（FG1）の根切り長さ（m）の計測寸法として、次のうち最も適切なものはどれか。",
+      "choiceA": "3.90m",
+      "choiceB": "4.50m",
+      "choiceC": "4.90m",
+      "choiceD": "5.50m",
+      "correct": "A",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_H29_043.png"
+    },
+    "H29sekisan-049": {
+      "stem": "下図の扉のフロートガラス（FL-5）と建具塗装数量（㎡）の次の組合せのうち、最も適切なものはどれか。ただし、建具の塗装係数は1.5とする。",
+      "choiceA": "ガラス2.56㎡ ― 建具塗装1.68㎡",
+      "choiceB": "ガラス2.56㎡ ― 建具塗装4.80㎡",
+      "choiceC": "ガラス2.88㎡ ― 建具塗装1.68㎡",
+      "choiceD": "ガラス2.88㎡ ― 建具塗装4.80㎡",
+      "correct": "D",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_H29_049.png"
+    },
+    "H30sekisan-012": {
+      "stem": "下記の内訳項目に対する刊行物単価の平均的な価格帯で、最も不適切なものはどれか。",
+      "choiceA": "普通コンクリート（材料）／FC21N/mm²・S-18／m³／8,000～20,000円",
+      "choiceB": "コンクリート打設手間（圧送費を含む）／上部躯体・200m³/回／m³／10,000～20,000円",
+      "choiceC": "異形鉄筋（材料）／SD295A・D10／t／60,000～80,000円",
+      "choiceD": "普通型枠（材工）／地上軸部／m²／4,000～6,000円",
+      "correct": "B",
+      "imageUrl": ""
+    },
+    "H30sekisan-043": {
+      "stem": "下図の独立基礎（F1）1か所の根切り数量（㎥）として、次のうち最も適切なものはどれか。",
+      "choiceA": "21.63㎥",
+      "choiceB": "22.53㎥",
+      "choiceC": "30.03㎥",
+      "choiceD": "32.78㎥",
+      "correct": "D",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_H30_043.png"
+    },
+    "H30sekisan-049": {
+      "stem": "下図の扉の塗装数量（㎡）と建具周囲モルタル充てん数量（m）の次の組合せのうち、最も適切なものはどれか。ただし、建具の塗装係数は2.5とする。",
+      "choiceA": "塗装3.00㎡ ― モルタル充てん4.80m",
+      "choiceB": "塗装3.00㎡ ― モルタル充てん4.90m",
+      "choiceC": "塗装4.00㎡ ― モルタル充てん4.80m",
+      "choiceD": "塗装4.00㎡ ― モルタル充てん4.90m",
+      "correct": "C",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_H30_049.png"
+    },
+    "R1sekisan-036": {
+      "stem": "軽量鉄骨（LGS）壁下地の高さが4.6m、石膏ボード両面二重張りの時の、スタッド幅とスタッド間隔の次の組合せのうち、最も適切なものはどれか。",
+      "choiceA": "90型 ― 300mm",
+      "choiceB": "90型 ― 450mm",
+      "choiceC": "100型 ― 300mm",
+      "choiceD": "100型 ― 450mm",
+      "correct": "D",
+      "imageUrl": ""
+    },
+    "R1sekisan-043": {
+      "stem": "下図の独立基礎における土工計画として、次のうち最も適切なものはどれか。なお、土質は普通土とする。",
+      "choiceA": "根切り深さ ― 1.85m",
+      "choiceB": "法幅 ― 0.56m",
+      "choiceC": "余幅 ― 0.80m",
+      "choiceD": "床付け ― 2.25㎡",
+      "correct": "C",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_R1_043.png"
+    },
+    "R1sekisan-045": {
+      "stem": "下図の単純梁に囲まれた床（S1）のコンクリート数量（㎥）として、最も適切なものはどれか。",
+      "choiceA": "1.72㎥",
+      "choiceB": "1.79㎥",
+      "choiceC": "1.88㎥",
+      "choiceD": "1.89㎥",
+      "correct": "D",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_R1_045.png"
+    },
+    "R1sekisan-047": {
+      "stem": "下図の鉄骨溶接H形鋼梁のL＝8,000、1台の溶接長さ（すみ肉6mm換算）（m）として、最も適切なものはどれか。溶接換算表の換算率を用いて計算しなさい。",
+      "choiceA": "72.00m",
+      "choiceB": "128.00m",
+      "choiceC": "144.00m",
+      "choiceD": "256.00m",
+      "correct": "A",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_R1_047.png"
+    },
+    "R2sekisan-016": {
+      "stem": "内訳書標準書式による種目内訳書式と種目の構成に関して、（A）～（C）に当てはまる次の組合せのうち、最も適切なものはどれか。",
+      "choiceA": "共通工事費 ― 共通仮設費 ― 屋上緑化",
+      "choiceB": "直接工事費 ― 直接仮設費 ― 屋上緑化",
+      "choiceC": "直接工事費 ― 共通仮設費 ― 囲障",
+      "choiceD": "共通工事費 ― 直接仮設費 ― 囲障",
+      "correct": "C",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_R2_016.png"
+    },
+    "R2sekisan-045": {
+      "stem": "下図の基礎梁（FG）のコンクリートの設計数量（㎥）に関する次のうち、最も適切なものはどれか。",
+      "choiceA": "2.29㎥",
+      "choiceB": "2.38㎥",
+      "choiceC": "2.43㎥",
+      "choiceD": "2.61㎥",
+      "correct": "B",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_R2_045.png"
+    },
+    "R2sekisan-050": {
+      "stem": "下図の扉を撤去工法で取り替える場合の枠回りのはつり数量（m）と建具周囲補修数量（m）の次の組合せのうち、最も適切なものはどれか。",
+      "choiceA": "枠回りのはつり4.80m ― 建具周囲補修4.80m",
+      "choiceB": "枠回りのはつり4.80m ― 建具周囲補修5.20m",
+      "choiceC": "枠回りのはつり4.90m ― 建具周囲補修4.90m",
+      "choiceD": "枠回りのはつり4.90m ― 建具周囲補修5.30m",
+      "correct": "A",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_R2_050.png"
+    },
+    "R3sekisan-016": {
+      "stem": "改修内訳書標準書式による工事費の構成に関して、（A）～（C）に当てはまる次の組合せのうち、最も適切なものはどれか。",
+      "choiceA": "外壁改修 ― 塗装改修 ― 環境配慮改修",
+      "choiceB": "外部改修 ― その他改修 ― 解体撤去",
+      "choiceC": "外部改修 ― 塗装改修 ― 環境配慮改修",
+      "choiceD": "外壁改修 ― その他改修 ― 解体撤去",
+      "correct": "A",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_R3_016.png"
+    },
+    "R3sekisan-043": {
+      "stem": "下図の独立基礎における土工計画として、次のうち最も適切なものはどれか。",
+      "choiceA": "根切り深さ ― 2.20m",
+      "choiceB": "法幅 ― 0.66m",
+      "choiceC": "余幅 ― 0.36m",
+      "choiceD": "砂利地業の幅 ― 2.20m",
+      "correct": "D",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_R3_043.png"
+    },
+    "R4sekisan-044": {
+      "stem": "下図の壁（W18）の各数量として、次のうち最も不適切なものはどれか。",
+      "choiceA": "縦筋の1本当りの長さは、4.30mである。",
+      "choiceB": "縦筋の数量は、210.70mである。",
+      "choiceC": "横筋の1本当りの長さは、4.20mである。",
+      "choiceD": "横筋の数量は、193.20mである。",
+      "correct": "B",
+      "imageUrl": "https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/sekisan_R4_044.png"
+    }
+  }
+}

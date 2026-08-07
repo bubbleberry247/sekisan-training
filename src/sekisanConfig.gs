@@ -9,6 +9,7 @@ var SEKISAN_LOCAL_STORAGE_PREFIX_ = 'sekisanTraining_';
 var SEKISAN_YEARS_ = ['H25', 'H26', 'H27', 'H28', 'H29', 'H30', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7'];
 var SEKISAN_MOCK_PARTS_ = ['FULL', 'I', 'II'];
 var SEKISAN_GITHUB_IMAGE_BASE_URL_ = 'https://raw.githubusercontent.com/bubbleberry247/sekisan-training/main/images/sekisan/';
+var SEKISAN_EXPECTED_IMAGE_COUNT_ = 114;
 
 function formatSekisanYear_(code) {
   var text = String(code || '').toUpperCase();
