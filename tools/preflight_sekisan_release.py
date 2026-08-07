@@ -42,6 +42,10 @@ EXPECTED_CORRECTION_COUNT = 37
 EXPECTED_IMAGE_COUNT = 114
 
 
+def normalize_line_endings(value: object) -> str:
+    return str(value if value is not None else "").replace("\r\n", "\n").replace("\r", "\n")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--csv", type=Path, default=DEFAULT_CSV)
@@ -141,8 +145,8 @@ def main() -> int:
         if not re.fullmatch(r"[A-D](?:,[A-D])?", str(correction.get("correct", ""))):
             issues.append(f"{qid}: invalid correct value {correction.get('correct')!r}")
         for field in sorted(REQUIRED_CORRECTION_FIELDS):
-            expected = str(correction.get(field, ""))
-            actual = str(row_map[qid].get(field, ""))
+            expected = normalize_line_endings(correction.get(field, ""))
+            actual = normalize_line_endings(row_map[qid].get(field, ""))
             if actual != expected:
                 issues.append(f"{qid}: CSV {field} does not match verified fixture")
 

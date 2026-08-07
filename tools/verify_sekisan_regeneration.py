@@ -15,6 +15,10 @@ DEFAULT_CANONICAL = REPO_DIR / "data" / "sekisan_all_final.csv"
 DEFAULT_IGNORED_FIELDS = {"updatedAt"}
 
 
+def normalize_line_endings(value: object) -> str:
+    return str(value if value is not None else "").replace("\r\n", "\n").replace("\r", "\n")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--candidate", type=Path, required=True)
@@ -51,8 +55,8 @@ def main() -> int:
         for field in canonical_headers:
             if field in DEFAULT_IGNORED_FIELDS:
                 continue
-            expected = str(canonical[qid].get(field, ""))
-            actual = str(candidate[qid].get(field, ""))
+            expected = normalize_line_endings(canonical[qid].get(field, ""))
+            actual = normalize_line_endings(candidate[qid].get(field, ""))
             if expected != actual:
                 issues.append({"qId": qid, "field": field, "expected": expected, "actual": actual})
 
