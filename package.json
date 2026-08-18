@@ -7,7 +7,7 @@
     "clasp:push": "clasp push",
     "lint": "echo \"(no lint)\"",
     "fix-csv": "node tools/fix_7_questions.mjs",
-    "test": "node tools/test_runtime_contracts.mjs && node tools/test_display_contracts.mjs && node tools/test_sekisan_image_link_plan.mjs && python tools/preflight_sekisan_release.py --local-only",
+    "test": "node tools/test_runtime_contracts.mjs && node tools/test_display_contracts.mjs && node tools/test_team_progress_dashboard.mjs && node tools/test_sekisan_image_link_plan.mjs && python tools/preflight_sekisan_release.py --local-only",
     "test:regeneration": "python tools/build_sekisan_final_csv.py --output-csv C:\\tmp\\sekisan_regenerated_test.csv --report-json C:\\tmp\\sekisan_regenerated_test_report.json && python tools/verify_sekisan_regeneration.py --candidate C:\\tmp\\sekisan_regenerated_test.csv && python tools/preflight_sekisan_release.py --csv C:\\tmp\\sekisan_regenerated_test.csv --local-only"
   },
   "devDependencies": {

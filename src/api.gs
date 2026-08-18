@@ -37,22 +37,35 @@ function buildTeamProgressSummary_(accessRows, userRows, allAttempts, totalTests
   var warnings = [];
   var userByEmail = {};
   var viewer = viewerAccess || {};
-  var viewerRole = String(viewer.role || 'user').toLowerCase();
-  var viewerEmail = String(viewer.email || '').toLowerCase();
+  var viewerRole = String(viewer.role || 'user').trim().toLowerCase();
+  var viewerEmail = String(viewer.email || '').trim().toLowerCase();
+  var isPrivilegedViewer = viewerRole === 'admin' || viewerRole === 'manager';
+  var includedByEmail = {};
+
+  if (!isPrivilegedViewer) return { team: team, warnings: warnings };
 
   userRows.forEach(function(r) {
-    var em = String(r.email || '').toLowerCase();
+    var em = String(r.email || '').trim().toLowerCase();
     if (em) userByEmail[em] = r;
   });
 
   accessRows.forEach(function(ar) {
-    var em = String(ar.email || '').toLowerCase();
+    var em = String(ar.email || '').trim().toLowerCase();
     if (!em) return;
-    if (viewerEmail && em === viewerEmail) return;
-    if (normalizeUserAccessBoolean_(ar.active, true) === 'false') return;
-    if (normalizeUserAccessBoolean_(ar.showInDashboard, true) === 'false') return;
-    if (viewerRole === 'manager' && String(ar.managerEmail || '').toLowerCase() !== viewerEmail) return;
-    if (viewerRole !== 'admin' && viewerRole !== 'manager') return;
+    if (includedByEmail[em]) return;
+    var isViewerSelf = viewerEmail && em === viewerEmail;
+    // 管理者・責任者は本人の行だけ、active/showInDashboard/managerEmailの
+    // 制約を免除する。他人の行には従来どおり全ての可視条件を適用する。
+    if (!isViewerSelf) {
+      if (normalizeUserAccessBoolean_(ar.active, true) === 'false') return;
+      if (normalizeUserAccessBoolean_(ar.showInDashboard, true) === 'false') return;
+      if (viewerRole === 'manager' &&
+          (!viewerEmail || String(ar.managerEmail || '').trim().toLowerCase() !== viewerEmail)) return;
+    }
+
+    // 条件の異なる重複行を合成せず、最初に適格となった実在行だけを採用する。
+    // これにより従来の並び順を保ちつつ、同一メールの二重表示を防ぐ。
+    includedByEmail[em] = true;
 
     var userRec = userByEmail[em] || {};
     var uk = String(userRec.userKey || '');
