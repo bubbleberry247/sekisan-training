@@ -71,5 +71,9 @@ const clientSource = fs.readFileSync(new URL('../src/index.html', import.meta.ur
 assert.match(clientSource, /function getAnswerMode\(q\)/);
 assert.match(clientSource, /getAnswerMode\(q\) === 'anyOf'/);
 assert.match(clientSource, /isCorrectSelection\(q, chosenKeys\)/);
+assert.match(clientSource, /H25sekisan-029/);
+assert.match(clientSource, /H28sekisan-026/);
+assert.match(clientSource, /fmtStem\(q\.stem, q\.qId\)/);
+assert.match(clientSource, /q\.explainLong \|\| q\.explainShort \|\| '解説がありません'/);
 
-console.log('runtime contracts: 34 assertions passed');
+console.log('runtime contracts: 38 assertions passed');

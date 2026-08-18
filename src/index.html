@@ -835,12 +835,22 @@
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
     }
-            function fmtStem(stem) {
-      var s = String(stem || '')
-        .replace(/(。)\s*([①-⑳])/g, '$1\n$2')
-        .replace(/(。)\s*・/g, '$1\n・')
-        .replace(/\n(?![・1-9①-⑳])/g, '')
-        .replace(/(\n|。)([1-9])(?=[^\d\s.．〜～・（「])/g, '$1$2．');
+    var STEM_NEWLINE_PRESERVE_QIDS_ = {
+      // 公式原本の段落・列挙をQuestionBankの改行のまま表示する対象。
+      // 他の問題は従来どおり、OCR由来の不要な改行を圧縮する。
+      'H25sekisan-029': true,
+      'H28sekisan-026': true
+    };
+    function fmtStem(stem, qId) {
+      var id = String(qId || '');
+      var s = String(stem || '').replace(/\r\n?/g, '\n');
+      if (!STEM_NEWLINE_PRESERVE_QIDS_[id]) {
+        s = s
+          .replace(/(。)\s*([①-⑳])/g, '$1\n$2')
+          .replace(/(。)\s*・/g, '$1\n・')
+          .replace(/\n(?![・1-9①-⑳])/g, '')
+          .replace(/(\n|。)([1-9])(?=[^\d\s.．〜～・（「])/g, '$1$2．');
+      }
       return boldMarkers(escapeHtml(s)).replace(/\n/g, '<br>');
     }
     function boldMarkers(text) {
@@ -3217,7 +3227,7 @@
 
       const imageHtml = renderQuestionImage(q);
       const metaHtml = renderQuestionMeta(q);
-      setHtml('exam-question', metaHtml + '<div><b>' + escapeHtml(qLabel) + '</b> ' + fmtStem(q.stem) + '</div>' + imageHtml);
+      setHtml('exam-question', metaHtml + '<div><b>' + escapeHtml(qLabel) + '</b> ' + fmtStem(q.stem, q.qId) + '</div>' + imageHtml);
       if (typeof renderMathInElement === 'function') {
         renderMathInElement(document.getElementById('exam-question'), {delimiters:[{left:'$',right:'$',display:false}],throwOnError:false});
       }
@@ -4209,7 +4219,7 @@
         if (!w.choices || w.choices.length === 0) {
           const multiLabel = answerMode === 'anyOf' ? '（いずれか1つ）' : (correctCount > 1 ? '（複数選択）' : '');
           const explain = w.explainChoice ? ('<div class="small">不正解解説: ' + escapeHtml(w.explainChoice) + '</div>') : '';
-          return '<div class="card"><div><b>' + escapeHtml(w.qId) + '</b> ' + fmtStem(w.stem) + '</div>' +
+          return '<div class="card"><div><b>' + escapeHtml(w.qId) + '</b> ' + fmtStem(w.stem, w.qId) + '</div>' +
             '<div class="small">あなたの回答: ' + escapeHtml(w.chosen) + ' / 正解: ' + escapeHtml(w.correct) + multiLabel + '</div>' +
             explainMainHtml + explain + '</div>';
         }
@@ -4251,7 +4261,7 @@
           '</div>';
         return [
           '<div class="card">',
-          '<div><b>' + escapeHtml(w.qId) + '</b> ' + fmtStem(w.stem) + '</div>',
+          '<div><b>' + escapeHtml(w.qId) + '</b> ' + fmtStem(w.stem, w.qId) + '</div>',
           '<div class="explain-card">',
           '<div class="explain-header">' + header + '</div>',
           explainMainHtml,
@@ -4324,7 +4334,7 @@
         var qNum = idx + 1;
         var stem = String(q.stem || '問題文なし');
         var correct = String(q.correct || '-');
-        var explainLong = String(q.explainLong || '解説がありません');
+        var explainLong = String(q.explainLong || q.explainShort || '解説がありません');
 
         // Check if user answered correctly
         var answered = state.answered && state.answered[q.qId];
@@ -4343,7 +4353,7 @@
 
         html += '<div style="background:' + bgColor + ';border-radius:8px;padding:12px;margin-bottom:12px;border:1px solid ' + borderColor + '">';
         html += '<div style="font-weight:700;color:' + (!answered ? '#5c4f3d' : (isCorrect ? '#4a7c59' : '#c62828')) + ';margin-bottom:6px">' + icon + '【Q' + qNum + '】</div>';
-        html += '<div style="font-size:0.9rem;line-height:1.6;margin-bottom:8px">' + fmtStem(stem) + '</div>';
+        html += '<div style="font-size:0.9rem;line-height:1.6;margin-bottom:8px">' + fmtStem(stem, q.qId) + '</div>';
         html += '<div style="font-size:0.85rem;color:#6b7280;margin-bottom:6px"><strong>正解:</strong> ' + escapeHtml(correct) + '</div>';
         html += '<div style="font-size:0.9rem;line-height:1.7;color:#1e293b;white-space:pre-wrap">' + escapeHtml(explainLong) + '</div>';
         html += '</div>';
