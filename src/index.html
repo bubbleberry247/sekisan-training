@@ -1332,7 +1332,7 @@
       payload.authStage = String(payload.authStage || getDefaultAuthStage_(payload.issueType));
       google.script.run
         .withFailureHandler(function() {})
-        .apiLogClientAuthIssue(payload);
+        .apiLogClientAuthIssue(payload, getClientUserKey());
     }
     function showRegistrationScreen_() {
       setHomeAuthMode_(true);
@@ -3942,7 +3942,7 @@
           setText('exam-error', result);
           console.error('[submitTest] failure:', err);
         })
-        .apiSubmitTest({ attemptId: state.attemptId, answers: answers });
+        .apiSubmitTest({ attemptId: state.attemptId, answers: answers }, getClientUserKey());
     }
 
     function startPracticeFromWeak() {
@@ -4044,7 +4044,7 @@
           setText('exam-error', result);
           console.error('[submitPractice] failure:', err);
         })
-        .apiSubmitPractice({ attemptId: state.attemptId, answers: answers });
+        .apiSubmitPractice({ attemptId: state.attemptId, answers: answers }, getClientUserKey());
     }
 
     function renderResult(res) {
