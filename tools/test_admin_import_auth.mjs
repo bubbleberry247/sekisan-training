@@ -159,6 +159,10 @@ assert.match(codeSource, /getQuestionBankImportUrl_\(\)/);
 assert.match(codeSource, /importQuestionBankFromCsv_\(csvText\)/);
 assert.match(codeSource, /importCsvText:\s*true/);
 assert.match(codeSource, /importCsvFromFolder[^]*maintenanceActions\[action\]/);
+assert.match(codeSource, /"linkGitHub":\s*true[^]*maintenanceActions\[action\]/);
+assert.match(codeSource, /"bootstrapAdmin":\s*true[^]*maintenanceActions\[action\]/);
+assert.match(codeSource, /ADMIN_bootstrapCurrentUserAccess_\(\)/);
+assert.doesNotMatch(codeSource, /ADMIN_bootstrapCurrentUserAccess\(\)/);
 
 
 console.log('admin import authorization contracts: blank/unknown/user deny and admin success');

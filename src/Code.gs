@@ -136,7 +136,7 @@ function doGet(e) {
       "createImageFolder": true, "clearTestSets": true, "clearCache": true,
       "resetTestPlan": true, "linkGitHub": true, "updateConfig": true,
       "linkImages": true, "importCsvFromFolder": true, "getImportFolderUrl": true,
-      "checkUserAccess": true, "diagWeekly": true
+      "checkUserAccess": true, "diagWeekly": true, "bootstrapAdmin": true
     };
     if (maintenanceActions[action]) {
       var maintenanceAuthError = requireMaintenanceKey_(e);
@@ -400,7 +400,7 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
     try {
-      ADMIN_bootstrapCurrentUserAccess();
+      ADMIN_bootstrapCurrentUserAccess_();
       return ContentService.createTextOutput(JSON.stringify({ ok: true, emailConfigured: true }))
         .setMimeType(ContentService.MimeType.JSON);
     } catch (err) {
