@@ -108,11 +108,12 @@ assert.deepEqual(emailsFrom(staleManagerRows, { role: 'manager', email: ' MANAGE
   'direct@example.com',
 ]);
 
-// A normal user never receives a team summary, including their own row.
-assert.deepEqual(emails({ role: 'user', email: ' user@example.com ' }), []);
+// A normal user receives exactly their own row, never another user's row.
+assert.deepEqual(emails({ role: 'user', email: ' user@example.com ' }), ['user@example.com']);
+assert.deepEqual(emails({ role: 'user', email: '   ' }), []);
 
-// The self exception is limited to admin/manager; no accidental inclusion of
-// inactive/hidden/non-direct other users is allowed.
+// The self exception applies to every signed-in role; no accidental inclusion
+// of inactive/hidden/non-direct other users is allowed.
 const managerSummary = context.buildTeamProgressSummary_(rows, userRows, attempts, 16, 'Asia/Tokyo', {
   role: 'manager', email: 'manager@example.com',
 });

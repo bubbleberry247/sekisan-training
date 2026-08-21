@@ -42,7 +42,7 @@ function buildTeamProgressSummary_(accessRows, userRows, allAttempts, totalTests
   var isPrivilegedViewer = viewerRole === 'admin' || viewerRole === 'manager';
   var includedByEmail = {};
 
-  if (!isPrivilegedViewer) return { team: team, warnings: warnings };
+  if (!isPrivilegedViewer && !viewerEmail) return { team: team, warnings: warnings };
 
   userRows.forEach(function(r) {
     var em = String(r.email || '').trim().toLowerCase();
@@ -54,8 +54,9 @@ function buildTeamProgressSummary_(accessRows, userRows, allAttempts, totalTests
     if (!em) return;
     if (includedByEmail[em]) return;
     var isViewerSelf = viewerEmail && em === viewerEmail;
-    // 管理者・責任者は本人の行だけ、active/showInDashboard/managerEmailの
-    // 制約を免除する。他人の行には従来どおり全ての可視条件を適用する。
+    if (viewerRole === 'user' && !isViewerSelf) return;
+    // Signed-in viewers may see their own row even when visibility metadata is
+    // stale.  The regular-user branch above still blocks every other address.
     if (!isViewerSelf) {
       if (normalizeUserAccessBoolean_(ar.active, true) === 'false') return;
       if (normalizeUserAccessBoolean_(ar.showInDashboard, true) === 'false') return;
@@ -289,7 +290,7 @@ function apiGetHome(clientUserKey) {
 
     var team = [];
     var teamWarnings = [];
-    if (access.role === 'manager' || access.role === 'admin') {
+    if (access.role === 'manager' || access.role === 'admin' || access.role === 'user') {
       try {
         var accessRows = readRecords_(getUserAccessSheet_());
         var userRows2 = readRecords_(getSheet_(SHEETS.Users));
