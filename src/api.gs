@@ -880,7 +880,10 @@ function apiSubmitPractice(payload) {
   return apiSubmitTest(payload);
 }
 
-function apiImportExplanations(csvText) {
+function apiImportExplanations(csvText, clientUserKey) {
+  __clientUserKey = clientUserKey || '';
+  var userCtx = getUserContext_();
+  requireAdmin_(userCtx);
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
@@ -964,7 +967,10 @@ function parseCsvLine_(line) {
   return result;
 }
 
-function apiAdminImportCsv(sheetName, csvText) {
+function apiAdminImportCsv(sheetName, csvText, clientUserKey) {
+  __clientUserKey = clientUserKey || '';
+  var userCtx = getUserContext_();
+  requireAdmin_(userCtx);
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
@@ -985,7 +991,10 @@ function apiAdminImportCsv(sheetName, csvText) {
   }
 }
 
-function apiAdminDryRunCsv(sheetName, csvText) {
+function apiAdminDryRunCsv(sheetName, csvText, clientUserKey) {
+  __clientUserKey = clientUserKey || '';
+  var userCtx = getUserContext_();
+  requireAdmin_(userCtx);
   if (sheetName === SHEETS.QuestionBank) {
     var mig = migrateQuestionBankSchema_();
     if (mig.status === 'manual') {
