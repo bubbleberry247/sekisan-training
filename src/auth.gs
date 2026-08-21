@@ -110,7 +110,7 @@ function ensureEffectiveUserInUserAccess_(email, displayName) {
   }
 }
 
-function ADMIN_bootstrapCurrentUserAccess() {
+function ADMIN_bootstrapCurrentUserAccess_() {
   var email = '';
   try { email = Session.getActiveUser().getEmail() || ''; } catch (activeErr) {}
   if (!email) {

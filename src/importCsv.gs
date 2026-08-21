@@ -6,7 +6,7 @@
  * @param {string} csvText - CSV文字列（ヘッダー含む）
  * @returns {Object} { ok: boolean, rowsImported: number, error?: string }
  */
-function importQuestionBankFromCsv(csvText) {
+function importQuestionBankFromCsv_(csvText) {
   try {
     if (!csvText || typeof csvText !== 'string') {
       throw new Error('csvText is required and must be a string');
@@ -160,7 +160,7 @@ function parseCsvLine_(line) {
  * QuestionBankインポート用のGoogle DriveフォルダURLを返す
  * @returns {Object} { ok: boolean, folderId?: string, folderUrl?: string, message: string }
  */
-function getQuestionBankImportUrl() {
+function getQuestionBankImportUrl_() {
   try {
     var folder = getOrCreateImportFolder_();
     return {
@@ -173,7 +173,7 @@ function getQuestionBankImportUrl() {
     return {
       ok: false,
       error: err.message,
-      message: '代わりに、CSVテキストを直接 importQuestionBankFromCsv() に渡すこともできます'
+      message: '代わりに、メンテナンスキー付きPOSTでCSVテキストを取り込めます'
     };
   }
 }
@@ -183,11 +183,11 @@ function getQuestionBankImportUrl() {
  * @param {string} fileId - DriveファイルID
  * @returns {Object} インポート結果
  */
-function importQuestionBankFromDriveFile(fileId) {
+function importQuestionBankFromDriveFile_(fileId) {
   try {
     var file = DriveApp.getFileById(fileId);
     var csvText = file.getBlob().getDataAsString('UTF-8');
-    return importQuestionBankFromCsv(csvText);
+    return importQuestionBankFromCsv_(csvText);
   } catch (err) {
     Logger.log('importQuestionBankFromDriveFile ERROR: ' + err.message);
     return {
@@ -201,7 +201,7 @@ function importQuestionBankFromDriveFile(fileId) {
  * Google Driveフォルダから最新のquestionbank_import.csvを自動インポート
  * @returns {Object} インポート結果
  */
-function importQuestionBankFromFolder() {
+function importQuestionBankFromFolder_() {
   try {
     var folder = getOrCreateImportFolder_();
     var files = folder.getFilesByName('questionbank_import.csv');
@@ -217,7 +217,7 @@ function importQuestionBankFromFolder() {
     var file = files.next();
     Logger.log('Found CSV file: ' + file.getName() + ' (ID: ' + file.getId() + ')');
 
-    return importQuestionBankFromDriveFile(file.getId());
+    return importQuestionBankFromDriveFile_(file.getId());
 
   } catch (err) {
     Logger.log('importQuestionBankFromFolder ERROR: ' + err.message);
@@ -255,14 +255,14 @@ function getOrCreateImportFolder_() {
  * テスト用: ローカルCSVファイルの内容を直接貼り付けて実行
  * Apps Scriptエディタで実行可能
  */
-function testImportQuestionBankFromCsv() {
+function testImportQuestionBankFromCsv_() {
   // サンプルCSV（最初の3行のみ）
   var sampleCsv = '﻿qId,segmentId,type,difficulty,tag1,tag2,tag3,lawTag,revisionFlag,conceptId,variantGroupId,source_ref,imageUrl,choiceImageUrl,stem,choiceA,choiceB,choiceC,choiceD,choiceE,explainA,explainB,explainC,explainD,explainE,correct,explainShort,explainLong,status,updatedAt\n' +
     'H25sekisan-001,sekisan_I,knowledge,3,Ⅰ建築一般,H25,,,0,,,BSIJ公式 H25,,,"建築積算業務に関する次の記述のうち、最も適切なものはどれか。","設計図書に基づいて数量や工事費を整理する。","図面を見ずに数量を決める。","毎回必ず複数解がある。","積算では仕様書を見ない。",,,,,,,A,"積算は設計図書を根拠に数量や工事費を整理する。","設計図書や仕様書を確認して数量・工事費を根拠立てて整理する。",published,2026-04-11T00:00:00\n' +
     'H25sekisan-026,sekisan_II,knowledge,3,Ⅱ数量積算,H25,,,0,,,BSIJ公式 H25,images/sekisan/sekisan_H25_026.png,,"数量積算の次の記述のうち、最も適切なものはどれか。","図面寸法と計測条件を確認して数量を算出する。","単位は問題ごとに自由に変えてよい。","数量積算では図表は使わない。","年度が違うと集計条件は確認しない。",,,,,,,A,"数量積算では図面寸法と計測条件の確認が重要である。","図面・仕様・計測条件を確認し、単位と集計条件を揃えて数量を算出する。",published,2026-04-11T00:00:00';
 
   Logger.log('Testing CSV import with sample data...');
-  var result = importQuestionBankFromCsv(sampleCsv);
+  var result = importQuestionBankFromCsv_(sampleCsv);
   Logger.log('Result: ' + JSON.stringify(result));
 
   return result;
@@ -272,13 +272,13 @@ function testImportQuestionBankFromCsv() {
  * 実際のCSVファイル全量をインポートする場合は、この関数を使用
  * CSVテキストを引数として渡す（Apps Scriptエディタでは実行しにくいため、Webエンドポイント経由推奨）
  */
-function importFullQuestionBank(csvText) {
+function importFullQuestionBank_(csvText) {
   if (!csvText) {
     throw new Error('csvText is required. Use testImportQuestionBankFromCsv() for sample test.');
   }
 
   Logger.log('Importing full QuestionBank CSV...');
-  var result = importQuestionBankFromCsv(csvText);
+  var result = importQuestionBankFromCsv_(csvText);
   Logger.log('Result: ' + JSON.stringify(result));
 
   return result;
@@ -287,9 +287,9 @@ function importFullQuestionBank(csvText) {
 /**
  * ファイルIDを指定してインポート
  */
-function importByFileId() {
+function importByFileId_() {
   var fileId = '13tgR5ynk6_s3BcAQY5oUJcoMA9qMBXy6';
-  var result = importQuestionBankFromDriveFile(fileId);
+  var result = importQuestionBankFromDriveFile_(fileId);
   Logger.log('Result: ' + JSON.stringify(result));
   return result;
 }
